@@ -1,5 +1,5 @@
 from sqlalchemy import BigInteger, Boolean, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -47,4 +47,8 @@ class User(Base):
         Boolean,
         default=True,
         nullable=False
+    )
+
+    subscriptions: Mapped[list["Subscription"]] = relationship(
+        back_populates="user"
     )

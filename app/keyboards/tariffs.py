@@ -1,17 +1,22 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.services.tariffs import TARIFFS
+from app.models.plan import Plan
 
 
-def tariffs_keyboard():
+def tariffs_keyboard(
+    plans: list[Plan],
+) -> InlineKeyboardMarkup:
+
     buttons = []
 
-    for tariff in TARIFFS:
+    for plan in plans:
         buttons.append([
             InlineKeyboardButton(
-                text=f"{tariff['name']} — {tariff['price']} ₽",
-                callback_data=f"buy:{tariff['id']}"
+                text=f"{plan.name} — {plan.price} ₽",
+                callback_data=f"buy:{plan.id}",
             )
         ])
 
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )

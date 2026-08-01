@@ -18,7 +18,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 
 from app.database.base import Base
-from app.models import User
+from app.models import User, Plan, Subscription
 
 target_metadata = Base.metadata
 

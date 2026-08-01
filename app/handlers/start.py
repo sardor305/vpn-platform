@@ -3,7 +3,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from app.database.database import async_session
-from app.repositories.user_repository import UserRepository
+from app.services.user_service import UserService
 
 from app.keyboards.menu import main_menu
 
@@ -14,23 +14,19 @@ router = Router()
 async def start_handler(message: Message):
 
     async with async_session() as session:
-        user_repo = UserRepository(session)
 
-        user = await user_repo.get_by_telegram_id(
-            message.from_user.id
+        user_service = UserService(session)
+
+        user, created = await user_service.get_or_create_user(
+            telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name,
+            language_code=message.from_user.language_code,
         )
 
-        if user is None:
-            user = await user_repo.create_user(
-                telegram_id=message.from_user.id,
-                username=message.from_user.username,
-                first_name=message.from_user.first_name,
-                last_name=message.from_user.last_name,
-                language_code=message.from_user.language_code,
-            )
-
+        if created:
             text = "🎉 Siz muvaffaqiyatli ro'yxatdan o'tdingiz!"
-
         else:
             text = "👋 Qaytganingizdan xursandmiz!"
 
