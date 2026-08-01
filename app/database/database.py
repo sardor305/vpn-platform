@@ -17,3 +17,7 @@ async def check_db_connection():
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
         print("✅ PostgreSQL bilan ulanish muvaffaqiyatli!")
+
+async def get_session():
+    async with async_session() as session:
+        yield session
