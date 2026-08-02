@@ -49,7 +49,7 @@ class SubscriptionRepository:
 
         self.session.add(subscription)
 
-        await self.session.commit()
+        await self.session.flush()
 
         await self.session.refresh(subscription)
 
@@ -60,7 +60,7 @@ class SubscriptionRepository:
         subscription: Subscription,
     ) -> Subscription:
 
-        await self.session.commit()
+        await self.session.flush()
 
         await self.session.refresh(subscription)
 

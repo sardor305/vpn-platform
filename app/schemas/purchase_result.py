@@ -9,5 +9,9 @@ class PurchaseResult:
 
     success: bool
     message: str
+
     plan: Plan | None = None
     subscription: Subscription | None = None
+
+    vpn_link: str | None = None
+    subscription_url: str | None = None

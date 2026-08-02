@@ -44,3 +44,7 @@ class Subscription(Base):
     plan: Mapped["Plan"] = relationship(
         back_populates="subscriptions"
     )
+
+    vpn_accounts: Mapped[list["VPNAccount"]] = relationship(
+        back_populates="subscription"
+    )
