@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription import Subscription
@@ -14,9 +15,15 @@ class SubscriptionRepository:
         user_id: int
     ) -> Subscription | None:
 
-        stmt = select(Subscription).where(
-            Subscription.user_id == user_id,
-            Subscription.status == "active"
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan)
+            )
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+            )
         )
 
         result = await self.session.execute(stmt)
@@ -41,6 +48,17 @@ class SubscriptionRepository:
         )
 
         self.session.add(subscription)
+
+        await self.session.commit()
+
+        await self.session.refresh(subscription)
+
+        return subscription
+
+    async def update(
+        self,
+        subscription: Subscription,
+    ) -> Subscription:
 
         await self.session.commit()
 

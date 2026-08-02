@@ -2,7 +2,8 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.database.database import async_session
-from app.services.plan_service import PlanService
+from app.services.purchase_service import PurchaseService
+from app.services.user_service import UserService
 
 router = Router()
 
@@ -14,22 +15,35 @@ async def select_tariff(callback: CallbackQuery):
 
     async with async_session() as session:
 
-        plan_service = PlanService(session)
+        user_service = UserService(session)
+        purchase_service = PurchaseService(session)
 
-        plan = await plan_service.get_plan(plan_id)
+        user, _ = await user_service.get_or_create_user(
+            telegram_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
+            last_name=callback.from_user.last_name,
+            language_code=callback.from_user.language_code,
+        )
 
-    if plan is None:
+        result = await purchase_service.purchase(
+            user_id=user.id,
+            plan_id=plan_id,
+        )
+
+    if not result.success:
         await callback.answer(
-            "Tarif topilmadi.",
+            result.message,
             show_alert=True,
         )
         return
 
     await callback.message.edit_text(
-        f"✅ Siz tanladingiz:\n\n"
-        f"{plan.name}\n"
-        f"💰 {plan.price} ₽\n\n"
-        f"Keyingi bosqich: to'lov usulini tanlash."
+        f"✅ {result.message}\n\n"
+        f"📦 Tarif: {result.plan.name}\n"
+        f"💰 Narxi: {result.plan.price} ₽\n"
+        f"📅 Amal qiladi:\n"
+        f"{result.subscription.end_date.strftime('%d.%m.%Y')} gacha"
     )
-
+    
     await callback.answer()

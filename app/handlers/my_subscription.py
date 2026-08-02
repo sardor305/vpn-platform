@@ -37,6 +37,19 @@ async def my_subscription(message: Message):
 
         return
 
+    status = (
+        "🟢 Faol"
+        if subscription.status == "active"
+        else "🔴 Faol emas"
+    )
+
     await message.answer(
-        "✅ Sizda faol obuna mavjud."
+        f"👤 Mening obunam\n\n"
+        f"📦 Tarif: {subscription.plan.name}\n"
+        f"💰 Narxi: {subscription.plan.price} ₽\n\n"
+        f"📅 Boshlangan sana:\n"
+        f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+        f"⏳ Tugash sanasi:\n"
+        f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+        f"{status}"
     )

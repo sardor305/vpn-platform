@@ -39,3 +39,21 @@ class SubscriptionService:
             start_date=start_date,
             end_date=end_date,
         )
+
+    async def extend_subscription(
+        self,
+        subscription: Subscription,
+        plan_id: int,
+        duration_days: int,
+    ) -> Subscription:
+
+        subscription.plan_id = plan_id
+
+        subscription.end_date = (
+            subscription.end_date
+            + timedelta(days=duration_days)
+        )
+
+        return await self.subscription_repository.update(
+            subscription
+        )
