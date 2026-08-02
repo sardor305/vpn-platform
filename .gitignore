@@ -13,3 +13,23 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Alembic
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# MyPy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
