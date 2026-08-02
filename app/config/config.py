@@ -9,6 +9,7 @@ class Config:
     DATABASE_URL = os.getenv("DATABASE_URL")
 
     MARZBAN_URL = os.getenv("MARZBAN_URL")
+    MARZBAN_PUBLIC_URL = os.getenv("MARZBAN_PUBLIC_URL")
     MARZBAN_USERNAME = os.getenv("MARZBAN_USERNAME")
     MARZBAN_PASSWORD = os.getenv("MARZBAN_PASSWORD")
 

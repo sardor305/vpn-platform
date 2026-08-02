@@ -3,6 +3,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.plan import Plan
+    from app.models.vpn_account import VPNAccount
+
 
 class Subscription(Base):
     __tablename__ = "subscriptions"

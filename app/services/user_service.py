@@ -9,6 +9,15 @@ class UserService:
     def __init__(self, session: AsyncSession):
         self.user_repository = UserRepository(session)
 
+    async def get_by_id(
+        self,
+        user_id: int,
+    ) -> User | None:
+
+        return await self.user_repository.get_by_id(
+            user_id
+        )
+
     async def get_or_create_user(
         self,
         telegram_id: int,

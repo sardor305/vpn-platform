@@ -38,12 +38,21 @@ async def select_tariff(callback: CallbackQuery):
         )
         return
 
-    await callback.message.edit_text(
-        f"✅ {result.message}\n\n"
-        f"📦 Tarif: {result.plan.name}\n"
-        f"💰 Narxi: {result.plan.price} ₽\n"
-        f"📅 Amal qiladi:\n"
-        f"{result.subscription.end_date.strftime('%d.%m.%Y')} gacha"
+    text = (
+        f"🎉 <b>VPN muvaffaqiyatli yaratildi!</b>\n\n"
+        f"📦 <b>Tarif:</b> {result.plan.name}\n"
+        f"💰 <b>Narxi:</b> {result.plan.price} ₽\n"
+        f"📅 <b>Amal qilish muddati:</b> "
+        f"{result.subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+        f"🔗 <b>VLESS havola:</b>\n"
+        f"<code>{result.vpn_link}</code>\n\n"
+        f"🔄 <b>Subscription:</b>\n"
+        f"<code>{result.subscription_url}</code>"
     )
-    
-    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+    )
+
+    await callback.answer("VPN yaratildi ✅")

@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.factories.marzban_factory import create_marzban_service
+from app.schemas.purchase_result import PurchaseResult
 from app.services.payment_service import PaymentService
 from app.services.plan_service import PlanService
 from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
-from app.schemas.purchase_result import PurchaseResult
+from app.services.vpn_account_service import VPNAccountService
 
 
 class PurchaseService:
@@ -18,11 +20,15 @@ class PurchaseService:
         self.payment_service = PaymentService()
         self.subscription_service = SubscriptionService(session)
 
+        self.vpn_account_service = VPNAccountService(session)
+        self.marzban_service = create_marzban_service()
+
     async def purchase(
         self,
         user_id: int,
         plan_id: int,
     ) -> PurchaseResult:
+
         plan = await self.plan_service.get_plan(
             plan_id
         )
@@ -33,10 +39,6 @@ class PurchaseService:
                 message="Tarif topilmadi.",
             )
 
-        subscription = await self.subscription_service.get_active_subscription(
-            user_id
-        )
-
         payment = await self.payment_service.create_test_payment()
 
         if not payment.success:
@@ -44,6 +46,10 @@ class PurchaseService:
                 success=False,
                 message=payment.message,
             )
+
+        subscription = await self.subscription_service.get_active_subscription(
+            user_id
+        )
 
         if subscription is not None:
 
@@ -61,9 +67,30 @@ class PurchaseService:
                 duration_days=plan.duration_days,
             )
 
+        user = await self.user_service.get_by_id(user_id)
+
+        if user is None:
+            return PurchaseResult(
+                success=False,
+                message="Foydalanuvchi topilmadi.",
+            )
+
+        marzban_user = await self.marzban_service.create_vless_user(
+            username=f"tg_{user.telegram_id}",
+        )
+
+        await self.vpn_account_service.create(
+            subscription_id=subscription.id,
+            marzban_username=marzban_user.username,
+            protocol="vless",
+            subscription_url=marzban_user.subscription_url,
+        )
+
         return PurchaseResult(
             success=True,
             message="Obuna muvaffaqiyatli rasmiylashtirildi.",
             plan=plan,
             subscription=subscription,
+            vpn_link=marzban_user.vpn_link,
+            subscription_url=marzban_user.subscription_url,
         )
