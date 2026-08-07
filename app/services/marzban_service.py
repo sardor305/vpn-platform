@@ -36,6 +36,9 @@ class MarzbanService:
                 user_data=user_data,
             )
 
+            print("\n========== CREATE USER RESPONSE ==========")
+            print(result)
+
         except HTTPStatusError as e:
 
             if e.response.status_code != 409:
@@ -50,9 +53,18 @@ class MarzbanService:
                     "Marzban foydalanuvchini qaytara olmadi."
                 )
 
+            print("\n========== GET USER RESPONSE ==========")
+            print(result)
+
+        print("\n========== DEBUG ==========")
+        print("USERNAME:", result.get("username"))
+        print("LINKS:", result.get("links"))
+        print("SUBSCRIPTION:", result.get("subscription_url"))
+        print("========================================\n")
+
         return MarzbanUser(
             username=result["username"],
-            vpn_link=result["links"][0],
+            vpn_link=result["links"][0] if result.get("links") else "",
             subscription_url=result["subscription_url"],
         )
 
