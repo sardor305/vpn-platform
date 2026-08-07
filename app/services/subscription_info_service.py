@@ -18,7 +18,7 @@ class SubscriptionInfoService:
             marzban_service=create_marzban_service(),
         )
 
-    async def get_subscription_info(
+    async def get_info(
         self,
         user_id: int,
     ):

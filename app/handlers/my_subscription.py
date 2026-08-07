@@ -5,7 +5,6 @@ from app.config.config import config
 from app.database.database import async_session
 from app.keyboards.subscription_keyboard import subscription_keyboard
 from app.services.subscription_info_service import SubscriptionInfoService
-from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 
 router = Router()
@@ -17,7 +16,6 @@ async def my_subscription(message: Message):
     async with async_session() as session:
 
         user_service = UserService(session)
-        subscription_service = SubscriptionService(session)
         subscription_info_service = SubscriptionInfoService(session)
 
         user, _ = await user_service.get_or_create_user(
@@ -28,11 +26,11 @@ async def my_subscription(message: Message):
             language_code=message.from_user.language_code,
         )
 
-        subscription = await subscription_service.get_active_subscription(
-            user.id
+        info = await subscription_info_service.get_info(
+            user.id,
         )
 
-        if subscription is None:
+        if info is None:
 
             await message.answer(
                 "❌ Sizda faol obuna mavjud emas.\n\n"
@@ -41,9 +39,8 @@ async def my_subscription(message: Message):
 
             return
 
-        info = await subscription_info_service.get_info(
-            subscription.id
-        )
+        subscription = info["subscription"]
+        vpn_account = info["vpn_account"]
 
     status = (
         "🟢 Faol"
@@ -52,7 +49,7 @@ async def my_subscription(message: Message):
     )
 
     subscription_url = (
-        f"{config.MARZBAN_PUBLIC_URL}{info.subscription_url}"
+        f"{config.MARZBAN_PUBLIC_URL}{vpn_account.subscription_url}"
     )
 
     await message.answer(
@@ -60,14 +57,14 @@ async def my_subscription(message: Message):
         f"📦 Tarif: <b>{subscription.plan.name}</b>\n"
         f"💰 Narxi: <b>{subscription.plan.price} ₽</b>\n\n"
         f"👤 Username:\n"
-        f"<code>{info.username}</code>\n\n"
+        f"<code>{vpn_account.marzban_username}</code>\n\n"
         f"📅 Boshlangan sana:\n"
         f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
         f"⏳ Tugash sanasi:\n"
         f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
         f"{status}\n\n"
         f"🔗 <b>VLESS havola:</b>\n"
-        f"<code>{info.vpn_link}</code>",
+        f"<code>{vpn_account.vpn_link}</code>",
         parse_mode="HTML",
         reply_markup=subscription_keyboard(
             subscription_url=subscription_url,
