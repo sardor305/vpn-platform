@@ -11,6 +11,9 @@ router = Router()
 @router.callback_query(F.data.startswith("buy:"))
 async def select_tariff(callback: CallbackQuery):
 
+    # Telegram callback'ni darhol yopamiz
+    await callback.answer()
+
     plan_id = int(callback.data.split(":")[1])
 
     async with async_session() as session:
@@ -31,11 +34,17 @@ async def select_tariff(callback: CallbackQuery):
             plan_id=plan_id,
         )
 
+        if result.success:
+            await session.commit()
+        else:
+            await session.rollback()
+
     if not result.success:
-        await callback.answer(
+
+        await callback.message.answer(
             result.message,
-            show_alert=True,
         )
+
         return
 
     text = (
@@ -54,5 +63,3 @@ async def select_tariff(callback: CallbackQuery):
         text,
         parse_mode="HTML",
     )
-
-    await callback.answer("VPN yaratildi ✅")

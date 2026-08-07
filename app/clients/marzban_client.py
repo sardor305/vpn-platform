@@ -38,6 +38,30 @@ class MarzbanClient:
 
         return self.token
 
+    async def get_user(
+        self,
+        username: str,
+    ):
+
+        if self.token is None:
+            raise RuntimeError(
+                "MarzbanClient is not authenticated. Call login() first."
+            )
+
+        response = await self.client.get(
+            f"/api/user/{username}",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+            },
+        )
+
+        if response.status_code == 404:
+            return None
+
+        response.raise_for_status()
+
+        return response.json()
+
     async def create_user(
         self,
         user_data: dict,

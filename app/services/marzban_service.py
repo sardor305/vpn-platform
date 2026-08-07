@@ -1,3 +1,5 @@
+from httpx import HTTPStatusError
+
 from app.clients.marzban_client import MarzbanClient
 from app.schemas.marzban_user import MarzbanUser
 
@@ -27,14 +29,31 @@ class MarzbanService:
 
         await self.login()
 
-        result = await self.client.create_user(
-            user_data=user_data,
-        )
+        username = user_data["username"]
+
+        try:
+            result = await self.client.create_user(
+                user_data=user_data,
+            )
+
+        except HTTPStatusError as e:
+
+            if e.response.status_code != 409:
+                raise
+
+            result = await self.client.get_user(
+                username=username,
+            )
+
+            if result is None:
+                raise RuntimeError(
+                    "Marzban foydalanuvchini qaytara olmadi."
+                )
 
         return MarzbanUser(
             username=result["username"],
             vpn_link=result["links"][0],
-            subscription_url=result["subscription_url"]
+            subscription_url=result["subscription_url"],
         )
 
     async def create_vless_user(
@@ -53,7 +72,7 @@ class MarzbanService:
                     inbound_name
                 ]
             },
-            "status": "active"
+            "status": "active",
         }
 
         return await self.create_user(
