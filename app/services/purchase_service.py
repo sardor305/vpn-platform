@@ -7,6 +7,7 @@ from app.services.plan_service import PlanService
 from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
+from app.services.username_service import UsernameService
 
 
 class PurchaseService:
@@ -19,6 +20,8 @@ class PurchaseService:
         self.plan_service = PlanService(session)
         self.payment_service = PaymentService()
         self.subscription_service = SubscriptionService(session)
+
+        self.username_service = UsernameService()
 
         self.vpn_account_service = VPNAccountService(session)
         self.marzban_service = create_marzban_service()
@@ -75,8 +78,12 @@ class PurchaseService:
                 message="Foydalanuvchi topilmadi.",
             )
 
+        username = self.username_service.generate(
+            user.id,
+        )
+
         marzban_user = await self.marzban_service.create_vless_user(
-            username=f"tg_{user.telegram_id}",
+            username=username,
         )
 
         await self.vpn_account_service.create(
