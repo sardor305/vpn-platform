@@ -35,6 +35,11 @@ class VPNAccount(Base):
         nullable=False
     )
 
+    vpn_link: Mapped[str] = mapped_column(
+        String(2048),
+        nullable=False
+    )
+
     subscription_url: Mapped[str] = mapped_column(
         String(512),
         nullable=False

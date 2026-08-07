@@ -7,7 +7,6 @@ from app.services.plan_service import PlanService
 from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
-from app.services.username_service import UsernameService
 
 
 class PurchaseService:
@@ -21,10 +20,12 @@ class PurchaseService:
         self.payment_service = PaymentService()
         self.subscription_service = SubscriptionService(session)
 
-        self.username_service = UsernameService()
-
-        self.vpn_account_service = VPNAccountService(session)
         self.marzban_service = create_marzban_service()
+
+        self.vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=self.marzban_service,
+        )
 
     async def purchase(
         self,
@@ -32,9 +33,7 @@ class PurchaseService:
         plan_id: int,
     ) -> PurchaseResult:
 
-        plan = await self.plan_service.get_plan(
-            plan_id
-        )
+        plan = await self.plan_service.get_plan(plan_id)
 
         if plan is None:
             return PurchaseResult(
@@ -55,15 +54,12 @@ class PurchaseService:
         )
 
         if subscription is not None:
-
             subscription = await self.subscription_service.extend_subscription(
                 subscription=subscription,
                 plan_id=plan.id,
                 duration_days=plan.duration_days,
             )
-
         else:
-
             subscription = await self.subscription_service.create_subscription(
                 user_id=user_id,
                 plan_id=plan.id,
@@ -78,19 +74,10 @@ class PurchaseService:
                 message="Foydalanuvchi topilmadi.",
             )
 
-        username = self.username_service.generate(
-            user.id,
-        )
-
-        marzban_user = await self.marzban_service.create_vless_user(
-            username=username,
-        )
-
-        await self.vpn_account_service.create(
+        vpn_account = await self.vpn_account_service.get_or_create(
             subscription_id=subscription.id,
-            marzban_username=marzban_user.username,
+            user_id=user.id,
             protocol="vless",
-            subscription_url=marzban_user.subscription_url,
         )
 
         return PurchaseResult(
@@ -98,6 +85,6 @@ class PurchaseService:
             message="Obuna muvaffaqiyatli rasmiylashtirildi.",
             plan=plan,
             subscription=subscription,
-            vpn_link=marzban_user.vpn_link,
-            subscription_url=marzban_user.subscription_url,
+            vpn_link=vpn_account.vpn_link,
+            subscription_url=vpn_account.subscription_url,
         )
