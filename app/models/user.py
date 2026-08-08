@@ -14,46 +14,51 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(
         Integer,
-        primary_key=True
+        primary_key=True,
     )
 
     telegram_id: Mapped[int] = mapped_column(
         BigInteger,
         unique=True,
         nullable=False,
-        index=True
+        index=True,
     )
 
     username: Mapped[str | None] = mapped_column(
-        String(64)
+        String(64),
+    )
+
+    phone_number: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
     )
 
     first_name: Mapped[str] = mapped_column(
         String(64),
-        nullable=False
+        nullable=False,
     )
 
     last_name: Mapped[str | None] = mapped_column(
-        String(64)
+        String(64),
     )
 
     language_code: Mapped[str] = mapped_column(
         String(10),
-        nullable=False
+        nullable=False,
     )
 
     is_admin: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
-        nullable=False
+        nullable=False,
     )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
-        nullable=False
+        nullable=False,
     )
 
     subscriptions: Mapped[list["Subscription"]] = relationship(
-        back_populates="user"
+        back_populates="user",
     )
