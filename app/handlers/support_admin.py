@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
@@ -7,8 +8,14 @@ from app.keyboards.support_admin import (
     ticket_keyboard,
     ticket_list_keyboard,
 )
-from app.services.support_ticket_service import SupportTicketService
+from app.services.support_message_service import (
+    SupportMessageService,
+)
+from app.services.support_ticket_service import (
+    SupportTicketService,
+)
 from app.services.user_service import UserService
+from app.states.support import SupportStates
 
 
 router = Router()
@@ -35,7 +42,6 @@ async def get_admin(
 async def support_tickets_list(
     message: Message,
 ):
-
     admin = await get_admin(
         telegram_id=message.from_user.id
     )
@@ -64,7 +70,8 @@ async def support_tickets_list(
 
     await message.answer(
         "📩 <b>Murojaatlar</b>\n\n"
-        f"Jami faol murojaatlar: <b>{len(tickets)}</b>\n\n"
+        f"Jami faol murojaatlar: "
+        f"<b>{len(tickets)}</b>\n\n"
         "Kerakli murojaatni tanlang:",
         parse_mode="HTML",
     )
@@ -96,7 +103,6 @@ async def support_tickets_list(
 async def view_ticket(
     callback: CallbackQuery,
 ):
-
     admin = await get_admin(
         telegram_id=callback.from_user.id
     )
@@ -182,3 +188,203 @@ async def view_ticket(
     )
 
     await callback.answer()
+
+
+@router.callback_query(
+    F.data.startswith("ticket_reply:")
+)
+async def start_ticket_reply(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None:
+        await callback.answer(
+            "Ruxsat berilmagan.",
+            show_alert=True,
+        )
+        return
+
+    ticket_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        support_service = SupportTicketService(
+            session
+        )
+
+        ticket = await support_service.get_by_id(
+            ticket_id=ticket_id
+        )
+
+    if ticket is None:
+        await callback.answer(
+            "Murojaat topilmadi.",
+            show_alert=True,
+        )
+        return
+
+    if ticket.status == "deleted":
+        await callback.answer(
+            "Bu murojaat o‘chirilgan.",
+            show_alert=True,
+        )
+        return
+
+    await state.set_state(
+        SupportStates.waiting_for_admin_reply
+    )
+
+    await state.update_data(
+        ticket_id=ticket_id
+    )
+
+    await callback.message.answer(
+        f"✍️ <b>Murojaat #{ticket_id}</b> uchun "
+        "javobingizni yozing.\n\n"
+        "❌ Bekor qilish uchun /cancel yozing.",
+        parse_mode="HTML",
+    )
+
+    await callback.answer()
+
+
+@router.message(
+    SupportStates.waiting_for_admin_reply,
+    F.text,
+)
+async def receive_admin_reply(
+    message: Message,
+    state: FSMContext,
+):
+    data = await state.get_data()
+
+    ticket_id = data.get("ticket_id")
+
+    if ticket_id is None:
+        await state.clear()
+
+        await message.answer(
+            "❌ Murojaat ma'lumotlari topilmadi."
+        )
+
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=message.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+            await state.clear()
+            return
+
+        support_service = SupportTicketService(
+            session
+        )
+
+        ticket = await support_service.get_by_id(
+            ticket_id=ticket_id
+        )
+
+        if ticket is None:
+            await state.clear()
+
+            await message.answer(
+                "❌ Murojaat topilmadi."
+            )
+
+            return
+
+        if ticket.status == "deleted":
+            await state.clear()
+
+            await message.answer(
+                "❌ Bu murojaat o‘chirilgan."
+            )
+
+            return
+
+        message_service = SupportMessageService(
+            session
+        )
+
+        await message_service.create_message(
+            ticket_id=ticket.id,
+            sender_id=admin.id,
+            sender_type="admin",
+            message=message.text,
+        )
+
+        await support_service.assign_admin(
+            ticket_id=ticket.id,
+            admin_id=admin.id,
+        )
+
+        user = await user_service.get_by_id(
+            user_id=ticket.user_id
+        )
+
+        await session.commit()
+
+    await state.clear()
+
+    if user is None:
+        await message.answer(
+            "⚠️ Javob saqlandi, "
+            "lekin foydalanuvchi topilmadi."
+        )
+        return
+
+    try:
+        await message.bot.send_message(
+            chat_id=user.telegram_id,
+            text=(
+                f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
+                "👨‍💼 <b>Admin javobi:</b>\n"
+                f"{message.text}"
+            ),
+            parse_mode="HTML",
+        )
+
+        await message.answer(
+            f"✅ <b>Murojaat #{ticket.id}</b> ga "
+            "javob yuborildi.",
+            parse_mode="HTML",
+        )
+
+    except Exception:
+        await message.answer(
+            "⚠️ Javob database'ga saqlandi, "
+            "ammo foydalanuvchiga Telegram orqali "
+            "yuborishda xatolik yuz berdi."
+        )
+
+
+@router.message(F.text == "/cancel")
+async def cancel_admin_reply(
+    message: Message,
+    state: FSMContext,
+):
+    current_state = await state.get_state()
+
+    if (
+        current_state
+        != SupportStates.waiting_for_admin_reply.state
+    ):
+        return
+
+    await state.clear()
+
+    await message.answer(
+        "❌ Murojaatga javob berish bekor qilindi.",
+        reply_markup=admin_menu,
+    )
