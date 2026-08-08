@@ -12,6 +12,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔑 VPN hisoblar"),
         ],
         [
+            KeyboardButton(text="📩 Murojaatlar"),
+        ],
+        [
             KeyboardButton(text="⬅️ Asosiy menyu"),
         ],
     ],
