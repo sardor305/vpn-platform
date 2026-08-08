@@ -1,10 +1,12 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from app.database.database import async_session
-from app.services.user_service import UserService
 from app.keyboards.menu import main_menu
+from app.keyboards.phone import phone_keyboard
+from app.services.user_service import UserService
+
 
 router = Router()
 
@@ -32,11 +34,27 @@ async def start_handler(message: Message):
             raise
 
     if created:
-        text = "🎉 Siz muvaffaqiyatli ro'yxatdan o'tdingiz!"
-    else:
-        text = "👋 Qaytganingizdan xursandmiz!"
+
+        await message.answer(
+            "🎉 Siz muvaffaqiyatli ro'yxatdan o'tdingiz!\n\n"
+            "👋 Assalomu alaykum!\n\n"
+            "VPN Platformaga xush kelibsiz.\n\n"
+            "📱 <b>Telefon raqamingiz</b>\n\n"
+            "Telefon raqamingiz sizni botdagi akkauntingiz "
+            "bilan bog‘lash va xizmatdan foydalanishingizni "
+            "qulay boshqarish uchun kerak.\n\n"
+            "🔒 Raqamingiz boshqa foydalanuvchilarga "
+            "ko‘rsatilmaydi.\n\n"
+            "Telefon raqamingizni ulashishni xohlamasangiz, "
+            "bu bosqichni o'tkazib yuborishingiz mumkin.",
+            parse_mode="HTML",
+            reply_markup=phone_keyboard,
+        )
+
+        return
 
     await message.answer(
-        f"{text}\n\n👋 Assalomu alaykum!\n\nVPN Platformaga xush kelibsiz.",
+        "👋 Qaytganingizdan xursandmiz!\n\n"
+        "🏠 Asosiy menyu",
         reply_markup=main_menu,
     )

@@ -63,6 +63,25 @@ class UserRepository:
 
         return user
 
+    async def update_phone_number(
+        self,
+        user_id: int,
+        phone_number: str,
+    ) -> User:
+
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            raise ValueError("User not found")
+
+        user.phone_number = phone_number
+
+        await self.session.flush()
+
+        await self.session.refresh(user)
+
+        return user
+
     async def get_all(
         self,
     ) -> list[User]:

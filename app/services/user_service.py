@@ -58,6 +58,17 @@ class UserService:
 
         return user, created
 
+    async def update_phone_number(
+        self,
+        user_id: int,
+        phone_number: str,
+    ) -> User:
+
+        return await self.user_repository.update_phone_number(
+            user_id=user_id,
+            phone_number=phone_number,
+        )
+
     async def get_all_users(
         self,
     ) -> list[User]:
