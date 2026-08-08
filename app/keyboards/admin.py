@@ -11,6 +11,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="📊 Statistika"),
             KeyboardButton(text="🔑 VPN hisoblar"),
         ],
+        [
+            KeyboardButton(text="⬅️ Asosiy menyu"),
+        ],
     ],
     resize_keyboard=True,
 )
