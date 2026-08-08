@@ -47,6 +47,26 @@ class SupportTicketRepository:
 
         return result.scalar_one_or_none()
 
+    async def get_user_tickets(
+        self,
+        user_id: int,
+    ) -> list[SupportTicket]:
+
+        stmt = (
+            select(SupportTicket)
+            .where(
+                SupportTicket.user_id == user_id,
+                SupportTicket.status != "deleted",
+            )
+            .order_by(
+                SupportTicket.created_at.desc()
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def get_active_tickets(
         self,
     ) -> list[SupportTicket]:
@@ -89,7 +109,9 @@ class SupportTicketRepository:
         admin_id: int,
     ) -> SupportTicket | None:
 
-        ticket = await self.get_by_id(ticket_id)
+        ticket = await self.get_by_id(
+            ticket_id
+        )
 
         if ticket is None:
             return None
@@ -107,7 +129,9 @@ class SupportTicketRepository:
         ticket_id: int,
     ) -> SupportTicket | None:
 
-        ticket = await self.get_by_id(ticket_id)
+        ticket = await self.get_by_id(
+            ticket_id
+        )
 
         if ticket is None:
             return None
@@ -124,7 +148,9 @@ class SupportTicketRepository:
         ticket_id: int,
     ) -> SupportTicket | None:
 
-        ticket = await self.get_by_id(ticket_id)
+        ticket = await self.get_by_id(
+            ticket_id
+        )
 
         if ticket is None:
             return None

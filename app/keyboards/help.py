@@ -28,6 +28,14 @@ def help_keyboard(
     keyboard.append(
         [
             KeyboardButton(
+                text="📂 Murojaatlarim"
+            )
+        ]
+    )
+
+    keyboard.append(
+        [
+            KeyboardButton(
                 text="⬅️ Asosiy menyu"
             )
         ]

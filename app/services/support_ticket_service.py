@@ -14,7 +14,9 @@ class SupportTicketService:
         self,
         session: AsyncSession,
     ):
-        self.repository = SupportTicketRepository(session)
+        self.repository = SupportTicketRepository(
+            session
+        )
 
     async def create_ticket(
         self,
@@ -33,7 +35,16 @@ class SupportTicketService:
     ) -> SupportTicket | None:
 
         return await self.repository.get_by_id(
-            ticket_id=ticket_id,
+            ticket_id=ticket_id
+        )
+
+    async def get_user_tickets(
+        self,
+        user_id: int,
+    ) -> list[SupportTicket]:
+
+        return await self.repository.get_user_tickets(
+            user_id=user_id
         )
 
     async def get_active_tickets(
@@ -65,7 +76,7 @@ class SupportTicketService:
     ) -> SupportTicket | None:
 
         ticket = await self.repository.close_ticket(
-            ticket_id=ticket_id,
+            ticket_id=ticket_id
         )
 
         if ticket is not None:
@@ -79,7 +90,7 @@ class SupportTicketService:
     ) -> SupportTicket | None:
 
         ticket = await self.repository.delete_ticket(
-            ticket_id=ticket_id,
+            ticket_id=ticket_id
         )
 
         if ticket is not None:

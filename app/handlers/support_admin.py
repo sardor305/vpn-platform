@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -58,7 +60,6 @@ async def support_tickets_list(
         tickets = await support_service.get_active_tickets()
 
     if not tickets:
-
         await message.answer(
             "📩 <b>Murojaatlar</b>\n\n"
             "Hozircha murojaatlar mavjud emas.",
@@ -141,23 +142,33 @@ async def view_ticket(
             user_id=ticket.user_id
         )
 
-    if user is None:
-        await callback.answer(
-            "Foydalanuvchi topilmadi.",
-            show_alert=True,
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        message_service = SupportMessageService(
+            session
         )
-        return
+
+        messages = (
+            await message_service.get_by_ticket_id(
+                ticket_id=ticket.id
+            )
+        )
 
     username = (
-        f"@{user.username}"
+        f"@{escape(user.username)}"
         if user.username
         else "—"
     )
 
-    full_name = user.first_name
+    full_name = escape(user.first_name)
 
     if user.last_name:
-        full_name += f" {user.last_name}"
+        full_name += f" {escape(user.last_name)}"
 
     status = {
         "new": "🟡 Yangi",
@@ -175,9 +186,24 @@ async def view_ticket(
         f"Username: {username}\n"
         f"🆔 User ID: <code>{user.id}</code>\n"
         f"📊 Status: {status}\n\n"
-        f"💬 <b>Murojaat:</b>\n"
-        f"{ticket.message}"
+        f"💬 <b>Yozishmalar:</b>\n\n"
     )
+
+    if not messages:
+        text += "Hozircha xabarlar mavjud emas.\n"
+
+    else:
+        for support_message in messages:
+
+            if support_message.sender_type == "user":
+                sender = "👤 Foydalanuvchi"
+            else:
+                sender = "👨‍💼 Admin"
+
+            text += (
+                f"<b>{sender}:</b>\n"
+                f"{escape(support_message.message)}\n\n"
+            )
 
     await callback.message.answer(
         text,
@@ -229,9 +255,12 @@ async def start_ticket_reply(
         )
         return
 
-    if ticket.status == "deleted":
+    if ticket.status in (
+        "closed",
+        "deleted",
+    ):
         await callback.answer(
-            "Bu murojaat o‘chirilgan.",
+            "Bu murojaat yopilgan.",
             show_alert=True,
         )
         return
@@ -304,11 +333,14 @@ async def receive_admin_reply(
 
             return
 
-        if ticket.status == "deleted":
+        if ticket.status in (
+            "closed",
+            "deleted",
+        ):
             await state.clear()
 
             await message.answer(
-                "❌ Bu murojaat o‘chirilgan."
+                "❌ Bu murojaat yopilgan."
             )
 
             return
@@ -324,6 +356,9 @@ async def receive_admin_reply(
             message=message.text,
         )
 
+        # Birinchi admin javobida ticket open bo'ladi.
+        # Keyingi javoblarda ham aynan shu admin
+        # biriktirilgan holda qoladi.
         await support_service.assign_admin(
             ticket_id=ticket.id,
             admin_id=admin.id,
@@ -350,9 +385,12 @@ async def receive_admin_reply(
             text=(
                 f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
                 "👨‍💼 <b>Admin javobi:</b>\n"
-                f"{message.text}"
+                f"{escape(message.text)}"
             ),
             parse_mode="HTML",
+            reply_markup=ticket_keyboard(
+                ticket.id
+            ),
         )
 
         await message.answer(
@@ -367,6 +405,148 @@ async def receive_admin_reply(
             "ammo foydalanuvchiga Telegram orqali "
             "yuborishda xatolik yuz berdi."
         )
+
+
+@router.callback_query(
+    F.data.startswith("ticket_close:")
+)
+async def close_ticket(
+    callback: CallbackQuery,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None:
+        await callback.answer(
+            "Ruxsat berilmagan.",
+            show_alert=True,
+        )
+        return
+
+    ticket_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        support_service = SupportTicketService(
+            session
+        )
+
+        ticket = await support_service.close_ticket(
+            ticket_id=ticket_id
+        )
+
+        if ticket is None:
+            await callback.answer(
+                "Murojaat topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        await session.commit()
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=ticket.user_id
+        )
+
+    if user is not None:
+
+        try:
+            await callback.bot.send_message(
+                chat_id=user.telegram_id,
+                text=(
+                    f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
+                    "✅ Murojaatingiz "
+                    "qo‘llab-quvvatlash xizmati tomonidan "
+                    "yechilgan deb belgilandi."
+                ),
+                parse_mode="HTML",
+            )
+
+        except Exception:
+            pass
+
+    await callback.message.answer(
+        f"✅ Murojaat #{ticket.id} yopildi.",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(
+    F.data.startswith("ticket_delete:")
+)
+async def delete_ticket(
+    callback: CallbackQuery,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None:
+        await callback.answer(
+            "Ruxsat berilmagan.",
+            show_alert=True,
+        )
+        return
+
+    ticket_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        support_service = SupportTicketService(
+            session
+        )
+
+        ticket = await support_service.delete_ticket(
+            ticket_id=ticket_id
+        )
+
+        if ticket is None:
+            await callback.answer(
+                "Murojaat topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        await session.commit()
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=ticket.user_id
+        )
+
+    if user is not None:
+
+        try:
+            await callback.bot.send_message(
+                chat_id=user.telegram_id,
+                text=(
+                    f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
+                    "🗑 Murojaatingiz o‘chirildi."
+                ),
+                parse_mode="HTML",
+            )
+
+        except Exception:
+            pass
+
+    await callback.message.answer(
+        f"🗑 Murojaat #{ticket.id} o‘chirildi.",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+
+    await callback.answer()
 
 
 @router.message(F.text == "/cancel")
