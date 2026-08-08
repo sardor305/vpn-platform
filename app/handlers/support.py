@@ -9,6 +9,7 @@ from app.keyboards.help import help_keyboard
 from app.keyboards.support_user import (
     user_ticket_keyboard,
     user_ticket_reply_keyboard,
+    user_ticket_new_keyboard,
     user_tickets_list_keyboard,
 )
 from app.services.support_message_service import (
@@ -69,14 +70,14 @@ async def receive_support_message(
         )
 
         # Har bir yangi murojaat uchun
-        # yangi ticket yaratiladi.
+        # alohida ticket yaratiladi.
         ticket = await support_service.create_ticket(
             user_id=user.id,
             message=message.text,
         )
 
-        # Birinchi xabar ham umumiy chat tarixiga
-        # support_messages orqali yoziladi.
+        # Birinchi xabarni ham support_messages
+        # jadvaliga yozamiz.
         message_service = SupportMessageService(
             session
         )
@@ -129,13 +130,11 @@ async def my_tickets(
         )
 
     if not tickets:
-
         await message.answer(
             "📂 <b>Murojaatlarim</b>\n\n"
             "Sizda hozircha murojaatlar mavjud emas.",
             parse_mode="HTML",
         )
-
         return
 
     await message.answer(
@@ -221,26 +220,41 @@ async def view_user_ticket(
         f"📊 Holat: {status_text}\n\n"
     )
 
-    for support_message in messages:
+    if not messages:
+        text += "Hozircha xabarlar mavjud emas.\n"
+    else:
+        for support_message in messages:
 
-        if support_message.sender_type == "user":
-            sender = "👤 Siz"
-        else:
-            sender = "👨‍💼 Admin"
+            if support_message.sender_type == "user":
+                sender = "👤 Siz"
+            else:
+                sender = "👨‍💼 Admin"
 
-        text += (
-            f"<b>{sender}:</b>\n"
-            f"{escape(support_message.message)}\n\n"
+            text += (
+                f"<b>{sender}:</b>\n"
+                f"{escape(support_message.message)}\n\n"
+            )
+
+    # NEW yoki OPEN bo'lsa — shu ticket davom ettiriladi.
+    if ticket.status in ("new", "open"):
+
+        reply_markup = user_ticket_reply_keyboard(
+            ticket.id
         )
+
+    # CLOSED bo'lsa — eski ticket davom ettirilmaydi.
+    # Yangi murojaat ochish tugmasi chiqadi.
+    elif ticket.status == "closed":
+
+        reply_markup = user_ticket_new_keyboard()
+
+    else:
+        reply_markup = None
 
     await callback.message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=(
-            user_ticket_reply_keyboard(ticket.id)
-            if ticket.status in ("new", "open")
-            else None
-        ),
+        reply_markup=reply_markup,
     )
 
     await callback.answer()
@@ -296,7 +310,8 @@ async def start_user_ticket_reply(
 
         if ticket.status not in ("new", "open"):
             await callback.answer(
-                "Bu murojaat yopilgan.",
+                "Bu murojaat yopilgan. "
+                "Yangi murojaat oching.",
                 show_alert=True,
             )
             return
@@ -312,6 +327,27 @@ async def start_user_ticket_reply(
     await callback.message.answer(
         f"✍️ <b>Murojaat #{ticket_id}</b>\n\n"
         "Javobingizni yozing.\n\n"
+        "❌ Bekor qilish uchun /cancel yozing.",
+        parse_mode="HTML",
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(
+    F.data == "user_ticket_new"
+)
+async def start_new_ticket(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    await state.set_state(
+        SupportStates.waiting_for_message
+    )
+
+    await callback.message.answer(
+        "✍️ <b>Yangi murojaat</b>\n\n"
+        "Muammoingiz yoki savolingizni yozing.\n\n"
         "❌ Bekor qilish uchun /cancel yozing.",
         parse_mode="HTML",
     )
@@ -378,11 +414,14 @@ async def receive_user_reply(
 
             return
 
+        # Faqat NEW yoki OPEN ticket davom ettiriladi.
         if ticket.status not in ("new", "open"):
             await state.clear()
 
             await message.answer(
-                "❌ Bu murojaat yopilgan."
+                "❌ Bu murojaat yopilgan.\n\n"
+                "Yangi murojaat ochish uchun "
+                "💬 Qo'llab-quvvatlash tugmasidan foydalaning."
             )
 
             return
