@@ -57,3 +57,15 @@ class UserService:
             created = True
 
         return user, created
+
+    async def get_all_users(
+        self,
+    ) -> list[User]:
+
+        return await self.user_repository.get_all()
+
+    async def count_users(
+        self,
+    ) -> int:
+
+        return await self.user_repository.count()

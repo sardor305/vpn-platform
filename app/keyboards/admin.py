@@ -17,3 +17,13 @@ admin_menu = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True,
 )
+
+
+users_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="⬅️ Admin panel"),
+        ],
+    ],
+    resize_keyboard=True,
+)

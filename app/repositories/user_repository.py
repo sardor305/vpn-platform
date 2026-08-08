@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -6,7 +6,10 @@ from app.models.user import User
 
 class UserRepository:
 
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ):
         self.session = session
 
     async def get_by_id(
@@ -24,7 +27,7 @@ class UserRepository:
 
     async def get_by_telegram_id(
         self,
-        telegram_id: int
+        telegram_id: int,
     ) -> User | None:
 
         stmt = select(User).where(
@@ -59,3 +62,27 @@ class UserRepository:
         await self.session.refresh(user)
 
         return user
+
+    async def get_all(
+        self,
+    ) -> list[User]:
+
+        stmt = select(User).order_by(
+            User.id
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
+    async def count(
+        self,
+    ) -> int:
+
+        stmt = select(
+            func.count(User.id)
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalar_one()
