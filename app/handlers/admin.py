@@ -54,6 +54,18 @@ async def statistics(message: Message):
 
         stats = await statistics_service.get_statistics()
 
+    protocol_lines = []
+
+    for protocol, count in stats.protocol_counts.items():
+        protocol_lines.append(
+            f"├ {protocol.upper()}: <b>{count}</b>"
+        )
+
+    protocol_text = "\n".join(protocol_lines)
+
+    if not protocol_text:
+        protocol_text = "└ Hozircha VPN hisoblar mavjud emas."
+
     text = (
         "📊 <b>STATISTIKA</b>\n\n"
 
@@ -72,7 +84,7 @@ async def statistics(message: Message):
         "🔑 <b>VPN HISOBLAR</b>\n"
         f"├ Jami: <b>{stats.total_vpn_accounts}</b>\n"
         f"├ Faol: <b>{stats.active_vpn_accounts}</b>\n"
-        f"└ VLESS: <b>{stats.vless_accounts}</b>\n\n"
+        f"{protocol_text}\n\n"
 
         "📩 <b>MUROJAATLAR</b>\n"
         f"├ Jami: <b>{stats.total_tickets}</b>\n"

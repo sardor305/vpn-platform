@@ -144,17 +144,30 @@ class StatisticsRepository:
 
         return result.scalar_one()
 
-    async def count_vless_accounts(self) -> int:
+    async def count_vpn_accounts_by_protocol(
+        self,
+    ) -> dict[str, int]:
 
-        stmt = select(
-            func.count(VPNAccount.id)
-        ).where(
-            VPNAccount.protocol == "vless"
+        stmt = (
+            select(
+                VPNAccount.protocol,
+                func.count(VPNAccount.id).label("count"),
+            )
+            .group_by(
+                VPNAccount.protocol
+            )
+            .order_by(
+                func.count(VPNAccount.id).desc(),
+                VPNAccount.protocol.asc(),
+            )
         )
 
         result = await self.session.execute(stmt)
 
-        return result.scalar_one()
+        return {
+            protocol: count
+            for protocol, count in result.all()
+        }
 
     async def count_total_tickets(self) -> int:
 

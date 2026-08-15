@@ -68,8 +68,8 @@ class StatisticsService:
             active_vpn_accounts=(
                 await self.repository.count_active_vpn_accounts()
             ),
-            vless_accounts=(
-                await self.repository.count_vless_accounts()
+            protocol_counts=(
+                await self.repository.count_vpn_accounts_by_protocol()
             ),
             total_tickets=(
                 await self.repository.count_total_tickets()

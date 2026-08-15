@@ -15,7 +15,7 @@ class StatisticsResult:
 
     total_vpn_accounts: int
     active_vpn_accounts: int
-    vless_accounts: int
+    protocol_counts: dict[str, int]
 
     total_tickets: int
     new_tickets: int
