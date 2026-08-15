@@ -22,6 +22,7 @@ from app.services.support_ticket_service import (
 )
 from app.services.user_service import UserService
 from app.states.support import SupportStates
+from app.states.plan import PlanStates
 
 
 router = Router()
@@ -560,15 +561,31 @@ async def cancel_admin_reply(
 ):
     current_state = await state.get_state()
 
-    if (
-        current_state
-        != SupportStates.waiting_for_admin_reply.state
-    ):
+    if current_state == SupportStates.waiting_for_admin_reply.state:
+        await state.clear()
+
+        await message.answer(
+            "❌ Murojaatga javob berish bekor qilindi.",
+            reply_markup=admin_menu,
+        )
+
         return
 
-    await state.clear()
-
-    await message.answer(
-        "❌ Murojaatga javob berish bekor qilindi.",
-        reply_markup=admin_menu,
+    plan_states = (
+        PlanStates.waiting_for_name.state,
+        PlanStates.waiting_for_price.state,
+        PlanStates.waiting_for_duration.state,
+        PlanStates.waiting_for_edit_name.state,
+        PlanStates.waiting_for_edit_price.state,
+        PlanStates.waiting_for_edit_duration.state,
     )
+
+    if current_state in plan_states:
+        await state.clear()
+
+        await message.answer(
+            "❌ Tarif bilan ishlash bekor qilindi.",
+            reply_markup=admin_menu,
+        )
+
+        return

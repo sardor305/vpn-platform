@@ -540,28 +540,53 @@ async def cancel_support(
 ):
     current_state = await state.get_state()
 
-    if current_state not in (
+    support_states = (
         SupportStates.waiting_for_message.state,
         SupportStates.waiting_for_user_reply.state,
-    ):
-        return
+    )
 
-    await state.clear()
+    plan_states = (
+        PlanStates.waiting_for_name.state,
+        PlanStates.waiting_for_price.state,
+        PlanStates.waiting_for_duration.state,
+        PlanStates.waiting_for_edit_name.state,
+        PlanStates.waiting_for_edit_price.state,
+        PlanStates.waiting_for_edit_duration.state,
+    )
 
-    async with async_session() as session:
+    if current_state in support_states:
 
-        user_service = UserService(session)
+        await state.clear()
 
-        user = await user_service.get_by_telegram_id(
-            telegram_id=message.from_user.id
+        async with async_session() as session:
+
+            user_service = UserService(session)
+
+            user = await user_service.get_by_telegram_id(
+                telegram_id=message.from_user.id
+            )
+
+        if user is None:
+            return
+
+        await message.answer(
+            "❌ Amal bekor qilindi.",
+            reply_markup=help_keyboard(
+                has_phone=bool(user.phone_number)
+            ),
         )
 
-    if user is None:
         return
 
-    await message.answer(
-        "❌ Amal bekor qilindi.",
-        reply_markup=help_keyboard(
-            has_phone=bool(user.phone_number)
-        ),
-    )
+    if current_state in plan_states:
+
+        await state.clear()
+
+        from app.keyboards.admin import admin_menu
+
+        await message.answer(
+            "❌ Tarif bilan ishlash bekor qilindi.",
+            reply_markup=admin_menu,
+        )
+
+        return
