@@ -4,6 +4,7 @@ from aiogram.types import Message
 from app.database.database import async_session
 from app.keyboards.admin import admin_menu, users_menu
 from app.keyboards.menu import main_menu
+from app.services.statistics_service import StatisticsService
 from app.services.user_service import UserService
 
 
@@ -30,6 +31,58 @@ async def admin_panel(message: Message):
     await message.answer(
         "🔐 <b>Admin panel</b>\n\n"
         "Kerakli bo'limni tanlang:",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+
+
+@router.message(F.text == "📊 Statistika")
+async def statistics(message: Message):
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=message.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+            return
+
+        statistics_service = StatisticsService(session)
+
+        stats = await statistics_service.get_statistics()
+
+    text = (
+        "📊 <b>STATISTIKA</b>\n\n"
+
+        "👥 <b>FOYDALANUVCHILAR</b>\n"
+        f"├ Jami: <b>{stats.total_users}</b>\n"
+        f"├ Faol: <b>{stats.active_users}</b>\n"
+        f"├ Faol emas: <b>{stats.inactive_users}</b>\n"
+        f"├ Bugun: <b>{stats.users_today}</b>\n"
+        f"└ Shu oy: <b>{stats.users_this_month}</b>\n\n"
+
+        "💳 <b>OBUNALAR</b>\n"
+        f"├ Jami: <b>{stats.total_subscriptions}</b>\n"
+        f"├ Faol: <b>{stats.active_subscriptions}</b>\n"
+        f"└ Muddati tugagan: <b>{stats.expired_subscriptions}</b>\n\n"
+
+        "🔑 <b>VPN HISOBLAR</b>\n"
+        f"├ Jami: <b>{stats.total_vpn_accounts}</b>\n"
+        f"├ Faol: <b>{stats.active_vpn_accounts}</b>\n"
+        f"└ VLESS: <b>{stats.vless_accounts}</b>\n\n"
+
+        "📩 <b>MUROJAATLAR</b>\n"
+        f"├ Jami: <b>{stats.total_tickets}</b>\n"
+        f"├ Yangi: <b>{stats.new_tickets}</b>\n"
+        f"├ Ochiq: <b>{stats.open_tickets}</b>\n"
+        f"└ Yopilgan: <b>{stats.closed_tickets}</b>"
+    )
+
+    await message.answer(
+        text,
         parse_mode="HTML",
         reply_markup=admin_menu,
     )
