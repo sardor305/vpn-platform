@@ -94,6 +94,21 @@ class UserRepository:
 
         return list(result.scalars().all())
 
+    async def get_all_admins(
+        self,
+    ) -> list[User]:
+
+        stmt = select(User).where(
+            User.is_admin.is_(True),
+            User.is_active.is_(True),
+        ).order_by(
+            User.id
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def count(
         self,
     ) -> int:

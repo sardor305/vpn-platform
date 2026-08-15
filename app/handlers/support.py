@@ -92,10 +92,56 @@ async def receive_support_message(
             message=message.text,
         )
 
+        # Barcha faol adminlarni olamiz.
+        admin_users = await user_service.get_all_admins()
+
         await session.commit()
 
     await state.clear()
 
+    # Murojaat kelganligi haqida barcha faol
+    # adminlarga avtomatik bildirishnoma yuboramiz.
+    for admin in admin_users:
+
+        try:
+            username = (
+                f"@{escape(user.username)}"
+                if user.username
+                else "—"
+            )
+
+            full_name = escape(user.first_name)
+
+            if user.last_name:
+                full_name += (
+                    f" {escape(user.last_name)}"
+                )
+
+            await message.bot.send_message(
+                chat_id=admin.telegram_id,
+                text=(
+                    "🔔 <b>Yangi murojaat!</b>\n\n"
+                    f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
+                    f"👤 <b>Foydalanuvchi:</b> "
+                    f"{full_name}\n"
+                    f"Username: {username}\n"
+                    f"🆔 User ID: "
+                    f"<code>{user.telegram_id}</code>\n\n"
+                    f"💬 <b>Xabar:</b>\n"
+                    f"{escape(message.text)}"
+                ),
+                parse_mode="HTML",
+                reply_markup=ticket_keyboard(
+                    ticket.id
+                ),
+            )
+
+        except Exception:
+            # Bitta admin xabarni qabul qila olmasa,
+            # boshqa adminlarga yuborishni davom ettiramiz.
+            pass
+
+    # Mijozga murojaat qabul qilinganligi haqida xabar.
     await message.answer(
         f"✅ <b>Murojaatingiz qabul qilindi!</b>\n\n"
         f"📩 Murojaat raqami: <b>#{ticket.id}</b>\n\n"

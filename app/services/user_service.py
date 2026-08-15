@@ -75,6 +75,12 @@ class UserService:
 
         return await self.user_repository.get_all()
 
+    async def get_all_admins(
+        self,
+    ) -> list[User]:
+
+        return await self.user_repository.get_all_admins()
+
     async def count_users(
         self,
     ) -> int:
