@@ -80,7 +80,7 @@ class SupportTicketService:
         )
 
         if ticket is not None:
-            ticket.closed_at = datetime.utcnow()
+            ticket.closed_at = datetime.now()
 
         return ticket
 
@@ -94,6 +94,6 @@ class SupportTicketService:
         )
 
         if ticket is not None:
-            ticket.deleted_at = datetime.utcnow()
+            ticket.deleted_at = datetime.now()
 
         return ticket

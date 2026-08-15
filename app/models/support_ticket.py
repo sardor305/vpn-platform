@@ -45,7 +45,7 @@ class SupportTicket(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=datetime.now,
     )
 
     closed_at: Mapped[datetime | None] = mapped_column(

@@ -44,7 +44,7 @@ class SupportMessage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=datetime.now,
     )
 
     ticket: Mapped["SupportTicket"] = relationship(
