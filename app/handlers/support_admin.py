@@ -10,6 +10,10 @@ from app.keyboards.support_admin import (
     ticket_keyboard,
     ticket_list_keyboard,
 )
+from app.keyboards.support_user import (
+    user_ticket_reply_keyboard,
+)
+
 from app.services.support_message_service import (
     SupportMessageService,
 )
@@ -388,7 +392,7 @@ async def receive_admin_reply(
                 f"{escape(message.text)}"
             ),
             parse_mode="HTML",
-            reply_markup=ticket_keyboard(
+            reply_markup=user_ticket_reply_keyboard(
                 ticket.id
             ),
         )

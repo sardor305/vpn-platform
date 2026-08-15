@@ -6,6 +6,9 @@ from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
 from app.keyboards.help import help_keyboard
+from app.keyboards.support_admin import (
+    ticket_keyboard,
+)
 from app.keyboards.support_user import (
     user_ticket_keyboard,
     user_ticket_reply_keyboard,
@@ -459,6 +462,9 @@ async def receive_user_reply(
                     f"{escape(message.text)}"
                 ),
                 parse_mode="HTML",
+                reply_markup=ticket_keyboard(
+                    ticket.id
+                ),
             )
 
         except Exception:
