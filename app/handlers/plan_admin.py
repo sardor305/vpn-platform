@@ -852,30 +852,3 @@ async def admin_plan_back(
     )
 
     await callback.answer()
-
-
-@router.message(F.text == "/cancel")
-async def cancel_plan_action(
-    message: Message,
-    state: FSMContext,
-):
-    current_state = await state.get_state()
-
-    plan_states = (
-        PlanStates.waiting_for_name.state,
-        PlanStates.waiting_for_price.state,
-        PlanStates.waiting_for_duration.state,
-        PlanStates.waiting_for_edit_name.state,
-        PlanStates.waiting_for_edit_price.state,
-        PlanStates.waiting_for_edit_duration.state,
-    )
-
-    if current_state not in plan_states:
-        return
-
-    await state.clear()
-
-    await message.answer(
-        "❌ Tarif bilan ishlash bekor qilindi.",
-        reply_markup=admin_menu,
-    )
