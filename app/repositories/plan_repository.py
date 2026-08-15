@@ -6,13 +6,30 @@ from app.models.plan import Plan
 
 class PlanRepository:
 
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ):
         self.session = session
 
-    async def get_all_active(self) -> list[Plan]:
+    async def get_all_active(
+        self,
+    ) -> list[Plan]:
 
         stmt = select(Plan).where(
-            Plan.is_active == True
+            Plan.is_active.is_(True)
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
+    async def get_all(
+        self,
+    ) -> list[Plan]:
+
+        stmt = select(Plan).order_by(
+            Plan.id
         )
 
         result = await self.session.execute(stmt)
@@ -21,7 +38,7 @@ class PlanRepository:
 
     async def get_by_id(
         self,
-        plan_id: int
+        plan_id: int,
     ) -> Plan | None:
 
         stmt = select(Plan).where(
@@ -44,3 +61,36 @@ class PlanRepository:
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def create(
+        self,
+        name: str,
+        price: int,
+        duration_days: int,
+    ) -> Plan:
+
+        plan = Plan(
+            name=name,
+            price=price,
+            duration_days=duration_days,
+            is_active=True,
+        )
+
+        self.session.add(plan)
+
+        await self.session.flush()
+
+        await self.session.refresh(plan)
+
+        return plan
+
+    async def update(
+        self,
+        plan: Plan,
+    ) -> Plan:
+
+        await self.session.flush()
+
+        await self.session.refresh(plan)
+
+        return plan

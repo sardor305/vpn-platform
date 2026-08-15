@@ -11,9 +11,16 @@ from app.handlers.help import router as help_router
 from app.handlers.support import router as support_router
 from app.handlers.support_admin import router as support_admin_router
 from app.handlers.buy import router as buy_router
-from app.handlers.tariff_selection import router as tariff_selection_router
-from app.handlers.my_subscription import router as my_subscription_router
+from app.handlers.tariff_selection import (
+    router as tariff_selection_router,
+)
+from app.handlers.my_subscription import (
+    router as my_subscription_router,
+)
 from app.handlers.admin import router as admin_router
+from app.handlers.plan_admin import (
+    router as plan_admin_router,
+)
 
 
 bot = Bot(
@@ -32,6 +39,7 @@ dp.include_router(buy_router)
 dp.include_router(tariff_selection_router)
 dp.include_router(my_subscription_router)
 dp.include_router(admin_router)
+dp.include_router(plan_admin_router)
 
 
 async def main():
