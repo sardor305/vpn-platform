@@ -113,3 +113,27 @@ class VPNAccountRepository:
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def activate(
+        self,
+        account: VPNAccount,
+    ) -> VPNAccount:
+
+        account.is_active = True
+
+        await self.session.flush()
+        await self.session.refresh(account)
+
+        return account
+
+    async def deactivate(
+        self,
+        account: VPNAccount,
+    ) -> VPNAccount:
+
+        account.is_active = False
+
+        await self.session.flush()
+        await self.session.refresh(account)
+
+        return account

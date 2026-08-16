@@ -67,3 +67,47 @@ class VPNAccountService:
         return await self.repository.get_by_id(
             account_id=account_id
         )
+
+    async def activate_account(
+        self,
+        account_id: int,
+    ) -> VPNAccount:
+
+        account = await self.repository.get_by_id(
+            account_id=account_id
+        )
+
+        if account is None:
+            raise ValueError(
+                "VPN hisob topilmadi."
+            )
+
+        await self.marzban_service.activate_user(
+            username=account.marzban_username,
+        )
+
+        return await self.repository.activate(
+            account
+        )
+
+    async def deactivate_account(
+        self,
+        account_id: int,
+    ) -> VPNAccount:
+
+        account = await self.repository.get_by_id(
+            account_id=account_id
+        )
+
+        if account is None:
+            raise ValueError(
+                "VPN hisob topilmadi."
+            )
+
+        await self.marzban_service.deactivate_user(
+            username=account.marzban_username,
+        )
+
+        return await self.repository.deactivate(
+            account
+        )

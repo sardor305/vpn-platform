@@ -17,6 +17,7 @@ class MarzbanService:
         self.password = password
 
     async def login(self):
+
         return await self.client.login(
             username=self.username,
             password=self.password,
@@ -32,6 +33,7 @@ class MarzbanService:
         username = user_data["username"]
 
         try:
+
             result = await self.client.create_user(
                 user_data=user_data,
             )
@@ -89,4 +91,32 @@ class MarzbanService:
 
         return await self.create_user(
             user_data=user_data,
+        )
+
+    async def activate_user(
+        self,
+        username: str,
+    ):
+
+        await self.login()
+
+        return await self.client.modify_user(
+            username=username,
+            user_data={
+                "status": "active",
+            },
+        )
+
+    async def deactivate_user(
+        self,
+        username: str,
+    ):
+
+        await self.login()
+
+        return await self.client.modify_user(
+            username=username,
+            user_data={
+                "status": "disabled",
+            },
         )

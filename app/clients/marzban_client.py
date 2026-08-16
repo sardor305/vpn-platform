@@ -83,3 +83,26 @@ class MarzbanClient:
         response.raise_for_status()
 
         return response.json()
+
+    async def modify_user(
+        self,
+        username: str,
+        user_data: dict,
+    ):
+
+        if self.token is None:
+            raise RuntimeError(
+                "MarzbanClient is not authenticated. Call login() first."
+            )
+
+        response = await self.client.put(
+            f"/api/user/{username}",
+            json=user_data,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+            },
+        )
+
+        response.raise_for_status()
+
+        return response.json()

@@ -30,6 +30,64 @@ async def get_admin(
         )
 
 
+async def show_vpn_account_detail(
+    message: Message,
+    account,
+):
+    user = account.subscription.user
+    plan = account.subscription.plan
+
+    full_name = user.first_name
+
+    if user.last_name:
+        full_name += f" {user.last_name}"
+
+    status = (
+        "🟢 Faol"
+        if account.is_active
+        else "🔴 Faol emas"
+    )
+
+    username = (
+        f"@{user.username}"
+        if user.username
+        else "—"
+    )
+
+    text = (
+        f"🔑 <b>VPN ACCOUNT #{account.id}</b>\n\n"
+
+        "👤 <b>FOYDALANUVCHI</b>\n"
+        f"├ Ism: {full_name}\n"
+        f"├ Username: {username}\n"
+        f"└ Telegram ID: "
+        f"<code>{user.telegram_id}</code>\n\n"
+
+        "📦 <b>OBUNA</b>\n"
+        f"├ Tarif: {plan.name}\n"
+        f"├ Boshlanishi: "
+        f"{account.subscription.start_date}\n"
+        f"└ Tugashi: "
+        f"{account.subscription.end_date}\n\n"
+
+        "🔐 <b>VPN</b>\n"
+        f"├ Protocol: "
+        f"<b>{account.protocol.upper()}</b>\n"
+        f"├ Marzban username: "
+        f"<code>{account.marzban_username}</code>\n"
+        f"└ Status: {status}"
+    )
+
+    await message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=vpn_account_actions_keyboard(
+            account_id=account.id,
+            is_active=account.is_active,
+        ),
+    )
+
+
 @router.message(F.text == "admin")
 async def admin_panel(message: Message):
 
@@ -236,10 +294,12 @@ async def vpn_accounts_back(
     )
 
     if user is None or not user.is_admin:
+
         await callback.answer(
             "Ruxsat yo'q.",
             show_alert=True,
         )
+
         return
 
     await callback.answer()
@@ -270,10 +330,12 @@ async def vpn_accounts_list_callback(
         )
 
         if admin is None or not admin.is_admin:
+
             await callback.answer(
                 "Ruxsat yo'q.",
                 show_alert=True,
             )
+
             return
 
         marzban_service = create_marzban_service()
@@ -330,10 +392,12 @@ async def vpn_account_detail(
         )
 
         if admin is None or not admin.is_admin:
+
             await callback.answer(
                 "Ruxsat yo'q.",
                 show_alert=True,
             )
+
             return
 
         marzban_service = create_marzban_service()
@@ -356,59 +420,288 @@ async def vpn_account_detail(
 
         return
 
-    user = account.subscription.user
-    plan = account.subscription.plan
-
-    full_name = user.first_name
-
-    if user.last_name:
-        full_name += f" {user.last_name}"
-
-    status = (
-        "🟢 Faol"
-        if account.is_active
-        else "🔴 Faol emas"
-    )
-
-    username = (
-        f"@{user.username}"
-        if user.username
-        else "—"
-    )
-
-    text = (
-        f"🔑 <b>VPN ACCOUNT #{account.id}</b>\n\n"
-
-        "👤 <b>FOYDALANUVCHI</b>\n"
-        f"├ Ism: {full_name}\n"
-        f"├ Username: {username}\n"
-        f"└ Telegram ID: "
-        f"<code>{user.telegram_id}</code>\n\n"
-
-        "📦 <b>OBUNA</b>\n"
-        f"├ Tarif: {plan.name}\n"
-        f"├ Boshlanishi: "
-        f"{account.subscription.start_date}\n"
-        f"└ Tugashi: "
-        f"{account.subscription.end_date}\n\n"
-
-        "🔐 <b>VPN</b>\n"
-        f"├ Protocol: "
-        f"<b>{account.protocol.upper()}</b>\n"
-        f"├ Marzban username: "
-        f"<code>{account.marzban_username}</code>\n"
-        f"└ Status: {status}"
-    )
-
     await callback.answer()
 
+    await show_vpn_account_detail(
+        message=callback.message,
+        account=account,
+    )
+
+
+@router.callback_query(F.data.startswith("vpn_activate:"))
+async def vpn_account_activate(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        try:
+
+            account = await vpn_account_service.activate_account(
+                account_id=account_id
+            )
+
+            await session.commit()
+
+        except ValueError as e:
+
+            await session.rollback()
+
+            await callback.answer(
+                str(e),
+                show_alert=True,
+            )
+
+            return
+
+        except Exception as e:
+
+            await session.rollback()
+
+            print(
+                "VPN ACTIVATE ERROR:",
+                repr(e),
+            )
+
+            await callback.answer(
+                "VPN hisobni faollashtirishda xatolik yuz berdi.",
+                show_alert=True,
+            )
+
+            return
+
+    await callback.answer(
+        "VPN hisob faollashtirildi. 🟢"
+    )
+
     await callback.message.edit_text(
-        text,
+        "VPN hisob yangilanmoqda...",
         parse_mode="HTML",
-        reply_markup=vpn_account_actions_keyboard(
-            account_id=account.id,
-            is_active=account.is_active,
-        ),
+    )
+
+    async with async_session() as session:
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.message.edit_text(
+            "VPN hisob topilmadi.",
+            parse_mode="HTML",
+        )
+
+        return
+
+    await show_vpn_account_detail(
+        message=callback.message,
+        account=account,
+    )
+
+
+@router.callback_query(F.data.startswith("vpn_deactivate:"))
+async def vpn_account_deactivate(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        try:
+
+            account = await vpn_account_service.deactivate_account(
+                account_id=account_id
+            )
+
+            await session.commit()
+
+        except ValueError as e:
+
+            await session.rollback()
+
+            await callback.answer(
+                str(e),
+                show_alert=True,
+            )
+
+            return
+
+        except Exception as e:
+
+            await session.rollback()
+
+            print(
+                "VPN DEACTIVATE ERROR:",
+                repr(e),
+            )
+
+            await callback.answer(
+                "VPN hisobni deaktivatsiya qilishda xatolik yuz berdi.",
+                show_alert=True,
+            )
+
+            return
+
+    await callback.answer(
+        "VPN hisob deaktivatsiya qilindi. 🔴"
+    )
+
+    await callback.message.edit_text(
+        "VPN hisob yangilanmoqda...",
+        parse_mode="HTML",
+    )
+
+    async with async_session() as session:
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.message.edit_text(
+            "VPN hisob topilmadi.",
+            parse_mode="HTML",
+        )
+
+        return
+
+    await show_vpn_account_detail(
+        message=callback.message,
+        account=account,
+    )
+
+
+@router.callback_query(F.data.startswith("vpn_refresh:"))
+async def vpn_account_refresh(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.answer(
+            "VPN hisob topilmadi.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer(
+        "Ma'lumotlar yangilandi. 🔄"
+    )
+
+    await show_vpn_account_detail(
+        message=callback.message,
+        account=account,
+    )
+
+
+@router.callback_query(F.data.startswith("vpn_delete:"))
+async def vpn_account_delete(
+    callback: CallbackQuery,
+):
+
+    await callback.answer(
+        "🗑 O‘chirish funksiyasi keyingi bosqichda qo‘shiladi.",
+        show_alert=True,
     )
 
 
