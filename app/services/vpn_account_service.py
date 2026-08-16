@@ -53,6 +53,17 @@ class VPNAccountService:
             subscription_url=marzban_user.subscription_url,
         )
 
+    async def get_existing(
+        self,
+        subscription_id: int,
+        protocol: str = "vless",
+    ) -> VPNAccount | None:
+
+        return await self.repository.get_by_subscription_and_protocol(
+            subscription_id=subscription_id,
+            protocol=protocol,
+        )
+
     async def get_all_accounts(
         self,
     ) -> list[VPNAccount]:

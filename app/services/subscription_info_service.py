@@ -30,9 +30,8 @@ class SubscriptionInfoService:
         if subscription is None:
             return None
 
-        vpn_account = await self.vpn_account_service.get_or_create(
+        vpn_account = await self.vpn_account_service.get_existing(
             subscription_id=subscription.id,
-            user_id=user_id,
         )
 
         return {
