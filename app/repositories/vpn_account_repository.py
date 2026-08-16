@@ -1,6 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.models.subscription import Subscription
 from app.models.vpn_account import VPNAccount
 
 
@@ -54,3 +56,60 @@ class VPNAccountRepository:
         await self.session.refresh(vpn_account)
 
         return vpn_account
+
+    async def get_all(
+        self,
+    ) -> list[VPNAccount]:
+
+        stmt = (
+            select(VPNAccount)
+            .options(
+                selectinload(
+                    VPNAccount.subscription
+                ).selectinload(
+                    Subscription.user
+                ),
+                selectinload(
+                    VPNAccount.subscription
+                ).selectinload(
+                    Subscription.plan
+                ),
+            )
+            .order_by(
+                VPNAccount.id
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(
+            result.scalars().all()
+        )
+
+    async def get_by_id(
+        self,
+        account_id: int,
+    ) -> VPNAccount | None:
+
+        stmt = (
+            select(VPNAccount)
+            .options(
+                selectinload(
+                    VPNAccount.subscription
+                ).selectinload(
+                    Subscription.user
+                ),
+                selectinload(
+                    VPNAccount.subscription
+                ).selectinload(
+                    Subscription.plan
+                ),
+            )
+            .where(
+                VPNAccount.id == account_id
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalar_one_or_none()

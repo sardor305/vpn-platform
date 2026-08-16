@@ -52,3 +52,18 @@ class VPNAccountService:
             vpn_link=marzban_user.vpn_link,
             subscription_url=marzban_user.subscription_url,
         )
+
+    async def get_all_accounts(
+        self,
+    ) -> list[VPNAccount]:
+
+        return await self.repository.get_all()
+
+    async def get_account(
+        self,
+        account_id: int,
+    ) -> VPNAccount | None:
+
+        return await self.repository.get_by_id(
+            account_id=account_id
+        )

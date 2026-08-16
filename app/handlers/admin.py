@@ -1,31 +1,43 @@
 from aiogram import F, Router
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
-from app.keyboards.admin import admin_menu, users_menu
+from app.factories.marzban_factory import create_marzban_service
+from app.keyboards.admin import (
+    admin_menu,
+    users_menu,
+    vpn_account_actions_keyboard,
+    vpn_accounts_keyboard,
+)
 from app.keyboards.menu import main_menu
 from app.services.statistics_service import StatisticsService
 from app.services.user_service import UserService
+from app.services.vpn_account_service import VPNAccountService
 
 
 router = Router()
 
 
-@router.message(F.text == "admin")
-async def admin_panel(message: Message):
-
+async def get_admin(
+    telegram_id: int,
+):
     async with async_session() as session:
 
         user_service = UserService(session)
 
-        user = await user_service.get_by_telegram_id(
-            telegram_id=message.from_user.id
+        return await user_service.get_by_telegram_id(
+            telegram_id=telegram_id
         )
 
-    if user is None:
-        return
 
-    if not user.is_admin:
+@router.message(F.text == "admin")
+async def admin_panel(message: Message):
+
+    user = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if user is None or not user.is_admin:
         return
 
     await message.answer(
@@ -167,16 +179,245 @@ async def users_list(message: Message):
     )
 
 
-@router.message(F.text == "⬅️ Admin panel")
-async def back_to_admin_panel(message: Message):
+@router.message(F.text == "🔑 VPN hisoblar")
+async def vpn_accounts_list(message: Message):
 
     async with async_session() as session:
 
         user_service = UserService(session)
 
-        user = await user_service.get_by_telegram_id(
+        admin = await user_service.get_by_telegram_id(
             telegram_id=message.from_user.id
         )
+
+        if admin is None or not admin.is_admin:
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        accounts = await vpn_account_service.get_all_accounts()
+
+    if not accounts:
+
+        await message.answer(
+            "🔑 <b>VPN HISOBLAR</b>\n\n"
+            "Hozircha VPN hisoblar mavjud emas.",
+            parse_mode="HTML",
+            reply_markup=admin_menu,
+        )
+
+        return
+
+    text = (
+        "🔑 <b>VPN HISOBLAR</b>\n\n"
+        f"📊 Jami: <b>{len(accounts)}</b>\n\n"
+        "Hisobni tanlang:"
+    )
+
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=vpn_accounts_keyboard(accounts),
+    )
+
+
+@router.callback_query(F.data == "vpn_accounts:back")
+async def vpn_accounts_back(
+    callback: CallbackQuery,
+):
+
+    user = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if user is None or not user.is_admin:
+        await callback.answer(
+            "Ruxsat yo'q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "🔐 <b>Admin panel</b>\n\n"
+        "Kerakli bo'limni tanlang:",
+        parse_mode="HTML",
+    )
+
+    await callback.message.answer(
+        "Admin panel:",
+        reply_markup=admin_menu,
+    )
+
+
+@router.callback_query(F.data == "vpn_accounts:list")
+async def vpn_accounts_list_callback(
+    callback: CallbackQuery,
+):
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        accounts = await vpn_account_service.get_all_accounts()
+
+    if not accounts:
+
+        await callback.answer()
+
+        await callback.message.edit_text(
+            "🔑 <b>VPN HISOBLAR</b>\n\n"
+            "Hozircha VPN hisoblar mavjud emas.",
+            parse_mode="HTML",
+        )
+
+        return
+
+    text = (
+        "🔑 <b>VPN HISOBLAR</b>\n\n"
+        f"📊 Jami: <b>{len(accounts)}</b>\n\n"
+        "Hisobni tanlang:"
+    )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=vpn_accounts_keyboard(accounts),
+    )
+
+
+@router.callback_query(F.data.startswith("vpn_account:"))
+async def vpn_account_detail(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.answer(
+            "VPN hisob topilmadi.",
+            show_alert=True,
+        )
+
+        return
+
+    user = account.subscription.user
+    plan = account.subscription.plan
+
+    full_name = user.first_name
+
+    if user.last_name:
+        full_name += f" {user.last_name}"
+
+    status = (
+        "🟢 Faol"
+        if account.is_active
+        else "🔴 Faol emas"
+    )
+
+    username = (
+        f"@{user.username}"
+        if user.username
+        else "—"
+    )
+
+    text = (
+        f"🔑 <b>VPN ACCOUNT #{account.id}</b>\n\n"
+
+        "👤 <b>FOYDALANUVCHI</b>\n"
+        f"├ Ism: {full_name}\n"
+        f"├ Username: {username}\n"
+        f"└ Telegram ID: "
+        f"<code>{user.telegram_id}</code>\n\n"
+
+        "📦 <b>OBUNA</b>\n"
+        f"├ Tarif: {plan.name}\n"
+        f"├ Boshlanishi: "
+        f"{account.subscription.start_date}\n"
+        f"└ Tugashi: "
+        f"{account.subscription.end_date}\n\n"
+
+        "🔐 <b>VPN</b>\n"
+        f"├ Protocol: "
+        f"<b>{account.protocol.upper()}</b>\n"
+        f"├ Marzban username: "
+        f"<code>{account.marzban_username}</code>\n"
+        f"└ Status: {status}"
+    )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=vpn_account_actions_keyboard(
+            account_id=account.id,
+            is_active=account.is_active,
+        ),
+    )
+
+
+@router.message(F.text == "⬅️ Admin panel")
+async def back_to_admin_panel(message: Message):
+
+    user = await get_admin(
+        telegram_id=message.from_user.id
+    )
 
     if user is None or not user.is_admin:
         return
