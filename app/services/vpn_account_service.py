@@ -111,3 +111,27 @@ class VPNAccountService:
         return await self.repository.deactivate(
             account
         )
+
+    async def delete_account(
+        self,
+        account_id: int,
+    ) -> VPNAccount:
+
+        account = await self.repository.get_by_id(
+            account_id=account_id
+        )
+
+        if account is None:
+            raise ValueError(
+                "VPN hisob topilmadi."
+            )
+
+        await self.marzban_service.delete_user(
+            username=account.marzban_username,
+        )
+
+        await self.repository.delete(
+            account
+        )
+
+        return account

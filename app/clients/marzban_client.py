@@ -106,3 +106,27 @@ class MarzbanClient:
         response.raise_for_status()
 
         return response.json()
+
+    async def delete_user(
+        self,
+        username: str,
+    ):
+
+        if self.token is None:
+            raise RuntimeError(
+                "MarzbanClient is not authenticated. Call login() first."
+            )
+
+        response = await self.client.delete(
+            f"/api/user/{username}",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+            },
+        )
+
+        if response.status_code == 404:
+            return False
+
+        response.raise_for_status()
+
+        return True

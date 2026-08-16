@@ -137,3 +137,12 @@ class VPNAccountRepository:
         await self.session.refresh(account)
 
         return account
+
+    async def delete(
+        self,
+        account: VPNAccount,
+    ) -> None:
+
+        await self.session.delete(account)
+
+        await self.session.flush()

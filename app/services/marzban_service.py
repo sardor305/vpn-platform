@@ -120,3 +120,14 @@ class MarzbanService:
                 "status": "disabled",
             },
         )
+
+    async def delete_user(
+        self,
+        username: str,
+    ) -> bool:
+
+        await self.login()
+
+        return await self.client.delete_user(
+            username=username,
+        )

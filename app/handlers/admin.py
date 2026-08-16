@@ -1,5 +1,10 @@
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from app.database.database import async_session
 from app.factories.marzban_factory import create_marzban_service
@@ -28,6 +33,26 @@ async def get_admin(
         return await user_service.get_by_telegram_id(
             telegram_id=telegram_id
         )
+
+
+def vpn_delete_confirmation_keyboard(
+    account_id: int,
+) -> InlineKeyboardMarkup:
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Ha, o‘chirish",
+                    callback_data=f"vpn_delete_confirm:{account_id}",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data=f"vpn_delete_cancel:{account_id}",
+                ),
+            ],
+        ]
+    )
 
 
 async def show_vpn_account_detail(
@@ -699,9 +724,237 @@ async def vpn_account_delete(
     callback: CallbackQuery,
 ):
 
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.answer(
+            "VPN hisob topilmadi.",
+            show_alert=True,
+        )
+
+        return
+
+    user = account.subscription.user
+
+    full_name = user.first_name
+
+    if user.last_name:
+        full_name += f" {user.last_name}"
+
+    text = (
+        "⚠️ <b>VPN HISOBNI O‘CHIRISH</b>\n\n"
+        f"🔑 Account: <b>#{account.id}</b>\n"
+        f"👤 Foydalanuvchi: <b>{full_name}</b>\n"
+        f"🔐 Marzban username: "
+        f"<code>{account.marzban_username}</code>\n\n"
+
+        "❗ <b>DIQQAT!</b>\n\n"
+        "Bu amal VPN hisobni butunlay o‘chiradi.\n\n"
+        "• Marzban VPN account o‘chiriladi\n"
+        "• VPNAccount bazadagi yozuvi o‘chiriladi\n"
+        "• Foydalanuvchi saqlanadi\n"
+        "• Obuna saqlanadi\n"
+        "• Tarif saqlanadi\n\n"
+
+        "Davom etishni xohlaysizmi?"
+    )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=vpn_delete_confirmation_keyboard(
+            account_id=account_id,
+        ),
+    )
+
+
+@router.callback_query(
+    F.data.startswith("vpn_delete_cancel:")
+)
+async def vpn_account_delete_cancel(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        account = await vpn_account_service.get_account(
+            account_id=account_id
+        )
+
+    if account is None:
+
+        await callback.answer(
+            "VPN hisob allaqachon o‘chirilgan.",
+            show_alert=True,
+        )
+
+        return
+
     await callback.answer(
-        "🗑 O‘chirish funksiyasi keyingi bosqichda qo‘shiladi.",
-        show_alert=True,
+        "O‘chirish bekor qilindi."
+    )
+
+    await show_vpn_account_detail(
+        message=callback.message,
+        account=account,
+    )
+
+
+@router.callback_query(
+    F.data.startswith("vpn_delete_confirm:")
+)
+async def vpn_account_delete_confirm(
+    callback: CallbackQuery,
+):
+
+    account_id = int(
+        callback.data.split(":")[1]
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        admin = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id
+        )
+
+        if admin is None or not admin.is_admin:
+
+            await callback.answer(
+                "Ruxsat yo'q.",
+                show_alert=True,
+            )
+
+            return
+
+        marzban_service = create_marzban_service()
+
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        try:
+
+            account = await vpn_account_service.delete_account(
+                account_id=account_id
+            )
+
+            await session.commit()
+
+        except ValueError as e:
+
+            await session.rollback()
+
+            await callback.answer(
+                str(e),
+                show_alert=True,
+            )
+
+            return
+
+        except Exception as e:
+
+            await session.rollback()
+
+            print(
+                "VPN DELETE ERROR:",
+                repr(e),
+            )
+
+            await callback.answer(
+                "VPN hisobni o‘chirishda xatolik yuz berdi.",
+                show_alert=True,
+            )
+
+            return
+
+    await callback.answer(
+        "VPN hisob o‘chirildi. 🗑"
+    )
+
+    await callback.message.edit_text(
+        "🔑 <b>VPN HISOBLAR</b>\n\n"
+        "VPN hisob muvaffaqiyatli o‘chirildi.\n\n"
+        "Hisoblar ro‘yxatini yangilash uchun "
+        "pastdagi tugmani bosing.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🔄 VPN hisoblar",
+                        callback_data="vpn_accounts:list",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Admin panel",
+                        callback_data="vpn_accounts:back",
+                    )
+                ],
+            ]
+        ),
     )
 
 
