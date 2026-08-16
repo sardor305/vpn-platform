@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +17,8 @@ class SubscriptionRepository:
         user_id: int
     ) -> Subscription | None:
 
+        now = datetime.now()
+
         stmt = (
             select(Subscription)
             .options(
@@ -23,6 +27,7 @@ class SubscriptionRepository:
             .where(
                 Subscription.user_id == user_id,
                 Subscription.status == "active",
+                Subscription.end_date > now,
             )
         )
 
