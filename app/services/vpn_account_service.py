@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.vpn_account import VPNAccount
@@ -21,6 +23,7 @@ class VPNAccountService:
         self,
         subscription_id: int,
         user_id: int,
+        end_date: datetime,
         protocol: str = "vless",
     ) -> VPNAccount:
 
@@ -30,6 +33,11 @@ class VPNAccountService:
         )
 
         if vpn_account is not None:
+            await self.marzban_service.update_user_expire(
+                username=vpn_account.marzban_username,
+                expire=end_date,
+            )
+
             return vpn_account
 
         username = self.username_service.generate(
@@ -39,6 +47,7 @@ class VPNAccountService:
         if protocol == "vless":
             marzban_user = await self.marzban_service.create_vless_user(
                 username=username,
+                expire=end_date,
             )
         else:
             raise ValueError(

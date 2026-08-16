@@ -77,6 +77,7 @@ class PurchaseService:
         vpn_account = await self.vpn_account_service.get_or_create(
             subscription_id=subscription.id,
             user_id=user.id,
+            end_date=subscription.end_date,
             protocol="vless",
         )
 

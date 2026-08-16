@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from httpx import HTTPStatusError
 
 from app.clients.marzban_client import MarzbanClient
@@ -22,6 +24,13 @@ class MarzbanService:
             username=self.username,
             password=self.password,
         )
+
+    @staticmethod
+    def _datetime_to_timestamp(
+        value: datetime,
+    ) -> int:
+
+        return int(value.timestamp())
 
     async def create_user(
         self,
@@ -62,6 +71,7 @@ class MarzbanService:
         print("USERNAME:", result.get("username"))
         print("LINKS:", result.get("links"))
         print("SUBSCRIPTION:", result.get("subscription_url"))
+        print("EXPIRE:", result.get("expire"))
         print("========================================\n")
 
         return MarzbanUser(
@@ -73,8 +83,13 @@ class MarzbanService:
     async def create_vless_user(
         self,
         username: str,
+        expire: datetime,
         inbound_name: str = "VLESS TCP",
     ) -> MarzbanUser:
+
+        expire_timestamp = self._datetime_to_timestamp(
+            expire
+        )
 
         user_data = {
             "username": username,
@@ -87,10 +102,30 @@ class MarzbanService:
                 ]
             },
             "status": "active",
+            "expire": expire_timestamp,
         }
 
         return await self.create_user(
             user_data=user_data,
+        )
+
+    async def update_user_expire(
+        self,
+        username: str,
+        expire: datetime,
+    ):
+
+        await self.login()
+
+        expire_timestamp = self._datetime_to_timestamp(
+            expire
+        )
+
+        return await self.client.modify_user(
+            username=username,
+            user_data={
+                "expire": expire_timestamp,
+            },
         )
 
     async def activate_user(
