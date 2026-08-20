@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.plan import Plan
-    from app.models.vpn_account import VPNAccount
 
 
 class Subscription(Base):
@@ -50,8 +49,4 @@ class Subscription(Base):
 
     plan: Mapped["Plan"] = relationship(
         back_populates="subscriptions"
-    )
-
-    vpn_accounts: Mapped[list["VPNAccount"]] = relationship(
-        back_populates="subscription"
     )
