@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.subscription import Subscription
+from app.models.user import User
 from app.models.vpn_account import VPNAccount
 
 
@@ -14,16 +14,16 @@ class VPNAccountRepository:
     ):
         self.session = session
 
-    async def get_by_subscription_and_protocol(
+    async def get_by_user_and_protocol(
         self,
-        subscription_id: int,
+        user_id: int,
         protocol: str,
     ) -> VPNAccount | None:
 
         stmt = (
             select(VPNAccount)
             .where(
-                VPNAccount.subscription_id == subscription_id,
+                VPNAccount.user_id == user_id,
                 VPNAccount.protocol == protocol,
             )
         )
@@ -34,7 +34,7 @@ class VPNAccountRepository:
 
     async def create(
         self,
-        subscription_id: int,
+        user_id: int,
         marzban_username: str,
         protocol: str,
         vpn_link: str,
@@ -42,7 +42,7 @@ class VPNAccountRepository:
     ) -> VPNAccount:
 
         vpn_account = VPNAccount(
-            subscription_id=subscription_id,
+            user_id=user_id,
             marzban_username=marzban_username,
             protocol=protocol,
             vpn_link=vpn_link,
@@ -65,14 +65,9 @@ class VPNAccountRepository:
             select(VPNAccount)
             .options(
                 selectinload(
-                    VPNAccount.subscription
+                    VPNAccount.user
                 ).selectinload(
-                    Subscription.user
-                ),
-                selectinload(
-                    VPNAccount.subscription
-                ).selectinload(
-                    Subscription.plan
+                    User.subscriptions
                 ),
             )
             .order_by(
@@ -95,14 +90,9 @@ class VPNAccountRepository:
             select(VPNAccount)
             .options(
                 selectinload(
-                    VPNAccount.subscription
+                    VPNAccount.user
                 ).selectinload(
-                    Subscription.user
-                ),
-                selectinload(
-                    VPNAccount.subscription
-                ).selectinload(
-                    Subscription.plan
+                    User.subscriptions
                 ),
             )
             .where(

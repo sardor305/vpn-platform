@@ -21,18 +21,18 @@ class VPNAccountService:
 
     async def get_or_create(
         self,
-        subscription_id: int,
         user_id: int,
         end_date: datetime,
         protocol: str = "vless",
     ) -> VPNAccount:
 
-        vpn_account = await self.repository.get_by_subscription_and_protocol(
-            subscription_id=subscription_id,
+        vpn_account = await self.repository.get_by_user_and_protocol(
+            user_id=user_id,
             protocol=protocol,
         )
 
         if vpn_account is not None:
+
             await self.marzban_service.update_user_expire(
                 username=vpn_account.marzban_username,
                 expire=end_date,
@@ -45,17 +45,19 @@ class VPNAccountService:
         )
 
         if protocol == "vless":
+
             marzban_user = await self.marzban_service.create_vless_user(
                 username=username,
                 expire=end_date,
             )
+
         else:
             raise ValueError(
                 f"Unsupported protocol: {protocol}"
             )
 
         return await self.repository.create(
-            subscription_id=subscription_id,
+            user_id=user_id,
             marzban_username=marzban_user.username,
             protocol=protocol,
             vpn_link=marzban_user.vpn_link,
@@ -64,12 +66,12 @@ class VPNAccountService:
 
     async def get_existing(
         self,
-        subscription_id: int,
+        user_id: int,
         protocol: str = "vless",
     ) -> VPNAccount | None:
 
-        return await self.repository.get_by_subscription_and_protocol(
-            subscription_id=subscription_id,
+        return await self.repository.get_by_user_and_protocol(
+            user_id=user_id,
             protocol=protocol,
         )
 

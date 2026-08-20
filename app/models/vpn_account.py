@@ -7,7 +7,7 @@ from app.database.base import Base
 
 
 if TYPE_CHECKING:
-    from app.models.subscription import Subscription
+    from app.models.user import User
 
 
 class VPNAccount(Base):
@@ -15,9 +15,9 @@ class VPNAccount(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "subscription_id",
+            "user_id",
             "protocol",
-            name="uq_subscription_protocol",
+            name="uq_user_protocol",
         ),
     )
 
@@ -26,8 +26,8 @@ class VPNAccount(Base):
         primary_key=True,
     )
 
-    subscription_id: Mapped[int] = mapped_column(
-        ForeignKey("subscriptions.id"),
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
         nullable=False,
         index=True,
     )
@@ -60,6 +60,6 @@ class VPNAccount(Base):
         nullable=False,
     )
 
-    subscription: Mapped["Subscription"] = relationship(
+    user: Mapped["User"] = relationship(
         back_populates="vpn_accounts",
     )

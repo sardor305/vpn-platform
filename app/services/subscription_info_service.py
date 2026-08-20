@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.factories.marzban_factory import create_marzban_service
 from app.services.subscription_service import SubscriptionService
 from app.services.vpn_account_service import VPNAccountService
-from app.factories.marzban_factory import create_marzban_service
 
 
 class SubscriptionInfoService:
@@ -31,7 +31,8 @@ class SubscriptionInfoService:
             return None
 
         vpn_account = await self.vpn_account_service.get_existing(
-            subscription_id=subscription.id,
+            user_id=user_id,
+            protocol="vless",
         )
 
         return {
