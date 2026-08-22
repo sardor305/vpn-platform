@@ -1,4 +1,8 @@
+from html import escape
+
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -16,11 +20,16 @@ from app.keyboards.admin import (
 )
 from app.keyboards.menu import main_menu
 from app.services.statistics_service import StatisticsService
+from app.services.subscription_info_service import SubscriptionInfoService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
 
 
 router = Router()
+
+
+class AdminSearchStates(StatesGroup):
+    waiting_for_user_id = State()
 
 
 async def get_admin(
@@ -55,23 +64,20 @@ def vpn_delete_confirmation_keyboard(
     )
 
 
+def format_datetime(value) -> str:
+    if value is None:
+        return "—"
+
+    return value.strftime(
+        "%d.%m.%Y %H:%M"
+    )
+
+
 async def show_vpn_account_detail(
     message: Message,
     account,
 ):
-    user = account.subscription.user
-    plan = account.subscription.plan
-
-    full_name = user.first_name
-
-    if user.last_name:
-        full_name += f" {user.last_name}"
-
-    status = (
-        "🟢 Faol"
-        if account.is_active
-        else "🔴 Faol emas"
-    )
+    user = account.user
 
     username = (
         f"@{user.username}"
@@ -79,27 +85,36 @@ async def show_vpn_account_detail(
         else "—"
     )
 
+    full_name = escape(
+        user.first_name
+    )
+
+    if user.last_name:
+        full_name += (
+            f" {escape(user.last_name)}"
+        )
+
+    status = (
+        "🟢 Faol"
+        if account.is_active
+        else "🔴 Faol emas"
+    )
+
     text = (
         f"🔑 <b>VPN ACCOUNT #{account.id}</b>\n\n"
 
         "👤 <b>FOYDALANUVCHI</b>\n"
+        f"├ User ID: <code>{user.id}</code>\n"
         f"├ Ism: {full_name}\n"
-        f"├ Username: {username}\n"
+        f"├ Username: {escape(username)}\n"
         f"└ Telegram ID: "
         f"<code>{user.telegram_id}</code>\n\n"
 
-        "📦 <b>OBUNA</b>\n"
-        f"├ Tarif: {plan.name}\n"
-        f"├ Boshlanishi: "
-        f"{account.subscription.start_date}\n"
-        f"└ Tugashi: "
-        f"{account.subscription.end_date}\n\n"
-
         "🔐 <b>VPN</b>\n"
         f"├ Protocol: "
-        f"<b>{account.protocol.upper()}</b>\n"
+        f"<b>{escape(account.protocol.upper())}</b>\n"
         f"├ Marzban username: "
-        f"<code>{account.marzban_username}</code>\n"
+        f"<code>{escape(account.marzban_username)}</code>\n"
         f"└ Status: {status}"
     )
 
@@ -110,6 +125,129 @@ async def show_vpn_account_detail(
             account_id=account.id,
             is_active=account.is_active,
         ),
+    )
+
+
+async def show_user_search_result(
+    message: Message,
+    user,
+):
+    async with async_session() as session:
+
+        subscription_info_service = SubscriptionInfoService(
+            session=session,
+        )
+
+        info = await subscription_info_service.get_info(
+            user_id=user.id
+        )
+
+    subscription = info["subscription"]
+    vpn_account = info["vpn_account"]
+
+    full_name = escape(
+        user.first_name
+    )
+
+    if user.last_name:
+        full_name += (
+            f" {escape(user.last_name)}"
+        )
+
+    username = (
+        f"@{escape(user.username)}"
+        if user.username
+        else "—"
+    )
+
+    phone = (
+        escape(user.phone_number)
+        if user.phone_number
+        else "—"
+    )
+
+    user_status = (
+        "🟢 Faol"
+        if user.is_active
+        else "🔴 Faol emas"
+    )
+
+    text = (
+        "🔎 <b>QIDIRUV NATIJASI</b>\n\n"
+
+        "👤 <b>FOYDALANUVCHI</b>\n"
+        f"├ User ID: <code>{user.id}</code>\n"
+        f"├ Telegram ID: <code>{user.telegram_id}</code>\n"
+        f"├ Ism: {full_name}\n"
+        f"├ Username: {username}\n"
+        f"├ Telefon: {phone}\n"
+        f"├ Til: <code>{escape(user.language_code)}</code>\n"
+        f"└ Status: {user_status}\n\n"
+    )
+
+    if subscription is None:
+
+        text += (
+            "📦 <b>OBUNA</b>\n"
+            "└ Faol obuna mavjud emas.\n\n"
+        )
+
+    else:
+
+        plan = subscription.plan
+
+        subscription_status = (
+            "🟢 Faol"
+            if subscription.status == "active"
+            else f"🔴 {escape(subscription.status)}"
+        )
+
+        text += (
+            "📦 <b>OBUNA</b>\n"
+            f"├ Tarif: <b>{escape(plan.name)}</b>\n"
+            f"├ Narx: <b>{plan.price}</b>\n"
+            f"├ Boshlanishi: "
+            f"{format_datetime(subscription.start_date)}\n"
+            f"├ Tugashi: "
+            f"{format_datetime(subscription.end_date)}\n"
+            f"└ Status: {subscription_status}\n\n"
+        )
+
+    if vpn_account is None:
+
+        text += (
+            "🔐 <b>VPN</b>\n"
+            "└ VPN hisob mavjud emas."
+        )
+
+    else:
+
+        vpn_status = (
+            "🟢 Faol"
+            if vpn_account.is_active
+            else "🔴 Faol emas"
+        )
+
+        text += (
+            "🔐 <b>VPN</b>\n"
+            f"├ Account ID: <code>{vpn_account.id}</code>\n"
+            f"├ Marzban username: "
+            f"<code>{escape(vpn_account.marzban_username)}</code>\n"
+            f"├ Protocol: "
+            f"<b>{escape(vpn_account.protocol.upper())}</b>\n"
+            f"└ Status: {vpn_status}\n\n"
+
+            "🔗 <b>VPN LINK</b>\n"
+            f"<code>{escape(vpn_account.vpn_link)}</code>\n\n"
+
+            "🔗 <b>SUBSCRIPTION URL</b>\n"
+            f"<code>{escape(vpn_account.subscription_url)}</code>"
+        )
+
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=admin_menu,
     )
 
 
@@ -128,6 +266,107 @@ async def admin_panel(message: Message):
         "Kerakli bo'limni tanlang:",
         parse_mode="HTML",
         reply_markup=admin_menu,
+    )
+
+
+@router.message(F.text == "🔎 Qidiruv")
+async def search_user(
+    message: Message,
+    state: FSMContext,
+):
+
+    user = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if user is None or not user.is_admin:
+        return
+
+    await state.set_state(
+        AdminSearchStates.waiting_for_user_id
+    )
+
+    await message.answer(
+        "🔎 <b>Foydalanuvchi qidirish</b>\n\n"
+        "User ID yoki Telegram ID raqamini yuboring.\n\n"
+        "Masalan:\n"
+        "<code>7</code>\n"
+        "yoki\n"
+        "<code>522599954</code>",
+        parse_mode="HTML",
+    )
+
+
+@router.message(
+    AdminSearchStates.waiting_for_user_id
+)
+async def process_user_search(
+    message: Message,
+    state: FSMContext,
+):
+
+    user = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if user is None or not user.is_admin:
+
+        await state.clear()
+
+        return
+
+    search_value = (
+        message.text or ""
+    ).strip()
+
+    if not search_value.isdigit():
+
+        await message.answer(
+            "❌ <b>Noto‘g‘ri format.</b>\n\n"
+            "Iltimos, User ID yoki Telegram ID "
+            "raqamini yuboring.",
+            parse_mode="HTML",
+        )
+
+        return
+
+    search_id = int(
+        search_value
+    )
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        found_user = await user_service.get_by_id(
+            user_id=search_id
+        )
+
+        if found_user is None:
+
+            found_user = (
+                await user_service.get_by_telegram_id(
+                    telegram_id=search_id
+                )
+            )
+
+    await state.clear()
+
+    if found_user is None:
+
+        await message.answer(
+            "❌ <b>Foydalanuvchi topilmadi.</b>\n\n"
+            f"Qidirilgan raqam: "
+            f"<code>{search_id}</code>",
+            parse_mode="HTML",
+            reply_markup=admin_menu,
+        )
+
+        return
+
+    await show_user_search_result(
+        message=message,
+        user=found_user,
     )
 
 
@@ -159,7 +398,9 @@ async def statistics(message: Message):
     protocol_text = "\n".join(protocol_lines)
 
     if not protocol_text:
-        protocol_text = "└ Hozircha VPN hisoblar mavjud emas."
+        protocol_text = (
+            "└ Hozircha VPN hisoblar mavjud emas."
+        )
 
     text = (
         "📊 <b>STATISTIKA</b>\n\n"
@@ -174,7 +415,8 @@ async def statistics(message: Message):
         "💳 <b>OBUNALAR</b>\n"
         f"├ Jami: <b>{stats.total_subscriptions}</b>\n"
         f"├ Faol: <b>{stats.active_subscriptions}</b>\n"
-        f"└ Muddati tugagan: <b>{stats.expired_subscriptions}</b>\n\n"
+        f"└ Muddati tugagan: "
+        f"<b>{stats.expired_subscriptions}</b>\n\n"
 
         "🔑 <b>VPN HISOBLAR</b>\n"
         f"├ Jami: <b>{stats.total_vpn_accounts}</b>\n"
@@ -231,7 +473,7 @@ async def users_list(message: Message):
     for user in users:
 
         username = (
-            f"@{user.username}"
+            f"@{escape(user.username)}"
             if user.username
             else "—"
         )
@@ -242,16 +484,21 @@ async def users_list(message: Message):
             else "🔴 Faol emas"
         )
 
-        full_name = user.first_name
+        full_name = escape(
+            user.first_name
+        )
 
         if user.last_name:
-            full_name += f" {user.last_name}"
+            full_name += (
+                f" {escape(user.last_name)}"
+            )
 
         text += (
             f"👤 <b>#{user.id}</b>\n"
             f"Ism: {full_name}\n"
             f"Username: {username}\n"
-            f"Telegram ID: <code>{user.telegram_id}</code>\n"
+            f"Telegram ID: "
+            f"<code>{user.telegram_id}</code>\n"
             f"Status: {status}\n\n"
         )
 
@@ -765,19 +1012,23 @@ async def vpn_account_delete(
 
         return
 
-    user = account.subscription.user
+    user = account.user
 
-    full_name = user.first_name
+    full_name = escape(
+        user.first_name
+    )
 
     if user.last_name:
-        full_name += f" {user.last_name}"
+        full_name += (
+            f" {escape(user.last_name)}"
+        )
 
     text = (
         "⚠️ <b>VPN HISOBNI O‘CHIRISH</b>\n\n"
         f"🔑 Account: <b>#{account.id}</b>\n"
         f"👤 Foydalanuvchi: <b>{full_name}</b>\n"
         f"🔐 Marzban username: "
-        f"<code>{account.marzban_username}</code>\n\n"
+        f"<code>{escape(account.marzban_username)}</code>\n\n"
 
         "❗ <b>DIQQAT!</b>\n\n"
         "Bu amal VPN hisobni butunlay o‘chiradi.\n\n"

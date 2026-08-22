@@ -17,6 +17,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔑 VPN hisoblar"),
         ],
         [
+            KeyboardButton(text="🔎 Qidiruv"),
+        ],
+        [
             KeyboardButton(text="📩 Murojaatlar"),
         ],
         [
@@ -89,6 +92,7 @@ def vpn_account_actions_keyboard(
     buttons = []
 
     if is_active:
+
         buttons.append(
             [
                 InlineKeyboardButton(
@@ -97,7 +101,9 @@ def vpn_account_actions_keyboard(
                 )
             ]
         )
+
     else:
+
         buttons.append(
             [
                 InlineKeyboardButton(
