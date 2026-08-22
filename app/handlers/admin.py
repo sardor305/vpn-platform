@@ -75,27 +75,6 @@ def format_datetime(value) -> str:
     )
 
 
-def format_timestamp(
-    timestamp,
-) -> str:
-
-    if timestamp is None:
-        return "—"
-
-    try:
-
-        return datetime.fromtimestamp(
-            int(timestamp),
-            tz=timezone.utc,
-        ).strftime(
-            "%d.%m.%Y %H:%M UTC"
-        )
-
-    except (TypeError, ValueError, OverflowError):
-
-        return "—"
-
-
 def format_traffic(
     value,
 ) -> str:
@@ -104,88 +83,149 @@ def format_traffic(
         return "—"
 
     try:
-
-        value = int(value)
-
+        value = float(value)
     except (TypeError, ValueError):
-
         return "—"
 
+    if value < 1024:
+        return f"{int(value)} B"
+
     units = [
-        "B",
         "KB",
         "MB",
         "GB",
         "TB",
+        "PB",
     ]
 
-    size = float(value)
+    size = value
 
     for unit in units:
 
-        if size < 1024:
-
-            if unit == "B":
-                return f"{int(size)} {unit}"
-
-            return f"{size:.2f} {unit}"
-
         size /= 1024
 
-    return f"{size:.2f} PB"
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+
+    return f"{size:.2f} EB"
 
 
-def format_online_at(
-    value,
+def format_marzban_status(
+    status: str | None,
 ) -> str:
 
-    if not value:
+    if not status:
         return "—"
 
-    try:
+    statuses = {
+        "active": "🟢 Faol",
+        "disabled": "🔴 O‘chirilgan",
+        "expired": "🟠 Muddati tugagan",
+        "limited": "🟠 Trafik limiti tugagan",
+        "on_hold": "🟡 Kutishda",
+    }
 
-        parsed = datetime.fromisoformat(
-            value.replace(
-                "Z",
-                "+00:00",
-            )
-        )
-
-        return parsed.astimezone(
-            timezone.utc
-        ).strftime(
-            "%d.%m.%Y %H:%M UTC"
-        )
-
-    except (
-        TypeError,
-        ValueError,
-    ):
-
-        return str(value)
+    return statuses.get(
+        status,
+        f"⚪ {escape(status)}",
+    )
 
 
-def format_data_limit(
+def format_marzban_expire(
     value,
 ) -> str:
 
     if value is None:
-        return "Cheksiz"
+        return "—"
 
-    return format_traffic(
-        value
+    try:
+        timestamp = int(value)
+    except (TypeError, ValueError):
+        return "—"
+
+    if timestamp == 0:
+        return "♾ Cheklanmagan"
+
+    try:
+        date = datetime.fromtimestamp(
+            timestamp,
+            timezone.utc,
+        )
+
+        return (
+            f"{date.strftime('%d.%m.%Y %H:%M')} UTC"
+        )
+
+    except (OverflowError, OSError, ValueError):
+        return "—"
+
+
+def format_marzban_online_at(
+    value,
+) -> str:
+
+    if not value:
+        return "Hozircha ulanmagan"
+
+    if isinstance(value, datetime):
+
+        date = value
+
+    else:
+
+        try:
+
+            value = str(value)
+
+            if value.endswith("Z"):
+                value = value[:-1] + "+00:00"
+
+            date = datetime.fromisoformat(
+                value
+            )
+
+        except ValueError:
+            return escape(str(value))
+
+    if date.tzinfo is None:
+
+        date = date.replace(
+            tzinfo=timezone.utc
+        )
+
+    return (
+        f"{date.astimezone(timezone.utc).strftime('%d.%m.%Y %H:%M:%S')} UTC"
     )
 
 
+def format_marzban_data_limit(
+    value,
+) -> str:
+
+    if value is None:
+        return "♾ Cheklanmagan"
+
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return "—"
+
+    if value == 0:
+        return "♾ Cheklanmagan"
+
+    return format_traffic(value)
+
+
 async def get_marzban_user_data(
-    marzban_username: str,
+    username: str,
 ):
-    marzban_service = create_marzban_service()
 
     try:
 
+        marzban_service = create_marzban_service()
+
         return await marzban_service.get_user(
-            username=marzban_username
+            username=username,
         )
 
     except Exception as e:
@@ -202,7 +242,6 @@ async def show_vpn_account_detail(
     message: Message,
     account,
 ):
-
     user = account.user
 
     username = (
@@ -258,7 +297,6 @@ async def show_user_search_result(
     message: Message,
     user,
 ):
-
     async with async_session() as session:
 
         subscription_info_service = SubscriptionInfoService(
@@ -340,6 +378,8 @@ async def show_user_search_result(
             f"└ Status: {subscription_status}\n\n"
         )
 
+    marzban_data = None
+
     if vpn_account is None:
 
         text += (
@@ -362,13 +402,89 @@ async def show_user_search_result(
             f"<code>{escape(vpn_account.marzban_username)}</code>\n"
             f"├ Protocol: "
             f"<b>{escape(vpn_account.protocol.upper())}</b>\n"
-            f"└ Status: {vpn_status}\n\n"
+            f"└ DB Status: {vpn_status}\n"
+        )
 
+        marzban_data = await get_marzban_user_data(
+            username=vpn_account.marzban_username,
+        )
+
+        if marzban_data is None:
+
+            text += (
+                "\n"
+                "☁️ <b>MARZBAN — REAL TIME</b>\n"
+                "└ ⚠️ Marzban'dan ma'lumot olib bo‘lmadi.\n"
+            )
+
+        else:
+
+            marzban_status = (
+                marzban_data.get("status")
+            )
+
+            used_traffic = (
+                marzban_data.get(
+                    "used_traffic"
+                )
+            )
+
+            lifetime_used_traffic = (
+                marzban_data.get(
+                    "lifetime_used_traffic"
+                )
+            )
+
+            expire = (
+                marzban_data.get("expire")
+            )
+
+            online_at = (
+                marzban_data.get("online_at")
+            )
+
+            data_limit = (
+                marzban_data.get("data_limit")
+            )
+
+            text += (
+                "\n"
+                "☁️ <b>MARZBAN — REAL TIME</b>\n"
+                f"├ Status: "
+                f"{format_marzban_status(marzban_status)}\n"
+                f"├ Traffic: "
+                f"<b>{format_traffic(used_traffic)}</b>\n"
+                f"├ Lifetime traffic: "
+                f"<b>{format_traffic(lifetime_used_traffic)}</b>\n"
+                f"├ Expire: "
+                f"<b>{format_marzban_expire(expire)}</b>\n"
+                f"├ Online: "
+                f"{format_marzban_online_at(online_at)}\n"
+                f"└ Data limit: "
+                f"<b>{format_marzban_data_limit(data_limit)}</b>\n"
+            )
+
+        vpn_link = (
+            marzban_data.get("links", [None])[0]
+            if marzban_data
+            and marzban_data.get("links")
+            else vpn_account.vpn_link
+        )
+
+        subscription_url = (
+            marzban_data.get("subscription_url")
+            if marzban_data
+            else vpn_account.subscription_url
+        )
+
+        text += "\n"
+
+        text += (
             "🔗 <b>VPN LINK</b>\n"
-            f"<code>{escape(vpn_account.vpn_link)}</code>\n\n"
+            f"<code>{escape(vpn_link or '—')}</code>\n\n"
 
             "🔗 <b>SUBSCRIPTION URL</b>\n"
-            f"<code>{escape(vpn_account.subscription_url)}</code>"
+            f"<code>{escape(subscription_url or '—')}</code>"
         )
 
     await message.answer(
@@ -522,9 +638,7 @@ async def statistics(message: Message):
             f"├ {protocol.upper()}: <b>{count}</b>"
         )
 
-    protocol_text = "\n".join(
-        protocol_lines
-    )
+    protocol_text = "\n".join(protocol_lines)
 
     if not protocol_text:
         protocol_text = (
