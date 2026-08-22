@@ -47,7 +47,9 @@ class MarzbanService:
                 user_data=user_data,
             )
 
-            print("\n========== CREATE USER RESPONSE ==========")
+            print(
+                "\n========== CREATE USER RESPONSE =========="
+            )
             print(result)
 
         except HTTPStatusError as e:
@@ -64,20 +66,44 @@ class MarzbanService:
                     "Marzban foydalanuvchini qaytara olmadi."
                 )
 
-            print("\n========== GET USER RESPONSE ==========")
+            print(
+                "\n========== GET USER RESPONSE =========="
+            )
             print(result)
 
-        print("\n========== DEBUG ==========")
-        print("USERNAME:", result.get("username"))
-        print("LINKS:", result.get("links"))
-        print("SUBSCRIPTION:", result.get("subscription_url"))
-        print("EXPIRE:", result.get("expire"))
-        print("========================================\n")
+        print(
+            "\n========== DEBUG =========="
+        )
+        print(
+            "USERNAME:",
+            result.get("username"),
+        )
+        print(
+            "LINKS:",
+            result.get("links"),
+        )
+        print(
+            "SUBSCRIPTION:",
+            result.get("subscription_url"),
+        )
+        print(
+            "EXPIRE:",
+            result.get("expire"),
+        )
+        print(
+            "========================================\n"
+        )
 
         return MarzbanUser(
             username=result["username"],
-            vpn_link=result["links"][0] if result.get("links") else "",
-            subscription_url=result["subscription_url"],
+            vpn_link=(
+                result["links"][0]
+                if result.get("links")
+                else ""
+            ),
+            subscription_url=result[
+                "subscription_url"
+            ],
         )
 
     async def create_vless_user(
@@ -87,8 +113,10 @@ class MarzbanService:
         inbound_name: str = "VLESS TCP",
     ) -> MarzbanUser:
 
-        expire_timestamp = self._datetime_to_timestamp(
-            expire
+        expire_timestamp = (
+            self._datetime_to_timestamp(
+                expire
+            )
         )
 
         user_data = {
@@ -109,6 +137,17 @@ class MarzbanService:
             user_data=user_data,
         )
 
+    async def get_user(
+        self,
+        username: str,
+    ) -> dict | None:
+
+        await self.login()
+
+        return await self.client.get_user(
+            username=username,
+        )
+
     async def update_user_expire(
         self,
         username: str,
@@ -117,8 +156,10 @@ class MarzbanService:
 
         await self.login()
 
-        expire_timestamp = self._datetime_to_timestamp(
-            expire
+        expire_timestamp = (
+            self._datetime_to_timestamp(
+                expire
+            )
         )
 
         return await self.client.modify_user(

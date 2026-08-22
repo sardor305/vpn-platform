@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from html import escape
 
 from aiogram import F, Router
@@ -65,6 +66,7 @@ def vpn_delete_confirmation_keyboard(
 
 
 def format_datetime(value) -> str:
+
     if value is None:
         return "—"
 
@@ -73,10 +75,134 @@ def format_datetime(value) -> str:
     )
 
 
+def format_timestamp(
+    timestamp,
+) -> str:
+
+    if timestamp is None:
+        return "—"
+
+    try:
+
+        return datetime.fromtimestamp(
+            int(timestamp),
+            tz=timezone.utc,
+        ).strftime(
+            "%d.%m.%Y %H:%M UTC"
+        )
+
+    except (TypeError, ValueError, OverflowError):
+
+        return "—"
+
+
+def format_traffic(
+    value,
+) -> str:
+
+    if value is None:
+        return "—"
+
+    try:
+
+        value = int(value)
+
+    except (TypeError, ValueError):
+
+        return "—"
+
+    units = [
+        "B",
+        "KB",
+        "MB",
+        "GB",
+        "TB",
+    ]
+
+    size = float(value)
+
+    for unit in units:
+
+        if size < 1024:
+
+            if unit == "B":
+                return f"{int(size)} {unit}"
+
+            return f"{size:.2f} {unit}"
+
+        size /= 1024
+
+    return f"{size:.2f} PB"
+
+
+def format_online_at(
+    value,
+) -> str:
+
+    if not value:
+        return "—"
+
+    try:
+
+        parsed = datetime.fromisoformat(
+            value.replace(
+                "Z",
+                "+00:00",
+            )
+        )
+
+        return parsed.astimezone(
+            timezone.utc
+        ).strftime(
+            "%d.%m.%Y %H:%M UTC"
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return str(value)
+
+
+def format_data_limit(
+    value,
+) -> str:
+
+    if value is None:
+        return "Cheksiz"
+
+    return format_traffic(
+        value
+    )
+
+
+async def get_marzban_user_data(
+    marzban_username: str,
+):
+    marzban_service = create_marzban_service()
+
+    try:
+
+        return await marzban_service.get_user(
+            username=marzban_username
+        )
+
+    except Exception as e:
+
+        print(
+            "MARZBAN GET USER ERROR:",
+            repr(e),
+        )
+
+        return None
+
+
 async def show_vpn_account_detail(
     message: Message,
     account,
 ):
+
     user = account.user
 
     username = (
@@ -132,6 +258,7 @@ async def show_user_search_result(
     message: Message,
     user,
 ):
+
     async with async_session() as session:
 
         subscription_info_service = SubscriptionInfoService(
@@ -395,7 +522,9 @@ async def statistics(message: Message):
             f"├ {protocol.upper()}: <b>{count}</b>"
         )
 
-    protocol_text = "\n".join(protocol_lines)
+    protocol_text = "\n".join(
+        protocol_lines
+    )
 
     if not protocol_text:
         protocol_text = (
