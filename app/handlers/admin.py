@@ -65,7 +65,53 @@ def vpn_delete_confirmation_keyboard(
     )
 
 
-def format_datetime(value) -> str:
+def search_result_keyboard(
+    user_id: int,
+) -> InlineKeyboardMarkup:
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 Yangilash",
+                    callback_data=f"search_refresh:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📋 VPN link",
+                    callback_data=f"search_vpn_link:{user_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🔗 Subscription",
+                    callback_data=f"search_subscription:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📦 Obunani o‘zgartirish",
+                    callback_data=f"search_change_plan:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⏳ Muddatni uzaytirish",
+                    callback_data=f"search_extend:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🚫 VPNni o‘chirish",
+                    callback_data=f"search_delete_vpn:{user_id}",
+                ),
+            ],
+        ]
+    )
+
+
+def format_datetime(
+    value,
+) -> str:
 
     if value is None:
         return "—"
@@ -490,7 +536,9 @@ async def show_user_search_result(
     await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=admin_menu,
+        reply_markup=search_result_keyboard(
+            user_id=user.id,
+        ),
     )
 
 
@@ -610,6 +658,62 @@ async def process_user_search(
     await show_user_search_result(
         message=message,
         user=found_user,
+    )
+
+
+@router.callback_query(
+    F.data.startswith("search_refresh:")
+)
+async def search_result_refresh(
+    callback: CallbackQuery,
+):
+
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+    if user is None:
+
+        await callback.answer(
+            "Foydalanuvchi topilmadi.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer(
+        "Ma'lumotlar yangilanmoqda... 🔄"
+    )
+
+    await callback.message.edit_text(
+        "🔄 <b>Ma'lumotlar yangilanmoqda...</b>",
+        parse_mode="HTML",
+    )
+
+    await show_user_search_result(
+        message=callback.message,
+        user=user,
     )
 
 
