@@ -15,6 +15,7 @@ from app.models import (
     VPNAccount,
     SupportTicket,
     SupportMessage,
+    Setting,
 )
 
 

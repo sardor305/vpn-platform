@@ -40,6 +40,26 @@ users_menu = ReplyKeyboardMarkup(
 )
 
 
+def daily_price_keyboard() -> InlineKeyboardMarkup:
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✏️ Narxni o‘zgartirish",
+                    callback_data="daily_price:change",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Admin panel",
+                    callback_data="daily_price:back",
+                )
+            ],
+        ]
+    )
+
+
 def vpn_accounts_keyboard(
     accounts,
 ) -> InlineKeyboardMarkup:
@@ -137,6 +157,67 @@ def vpn_account_actions_keyboard(
                 text="⬅️ VPN hisoblar",
                 callback_data="vpn_accounts:list",
             )
+        ]
+    )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+
+def admin_user_search_actions_keyboard(
+    user_id: int,
+    vpn_account_id: int | None = None,
+) -> InlineKeyboardMarkup:
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text="🔄 Yangilash",
+                callback_data=f"admin_user_refresh:{user_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="📋 VPN link",
+                callback_data=f"admin_user_vpn_link:{user_id}",
+            ),
+            InlineKeyboardButton(
+                text="🔗 Subscription",
+                callback_data=f"admin_user_subscription:{user_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="📦 Obunani o‘zgartirish",
+                callback_data=f"admin_user_change_plan:{user_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="⏳ Muddatni uzaytirish",
+                callback_data=f"admin_user_extend:{user_id}",
+            ),
+        ],
+    ]
+
+    if vpn_account_id is not None:
+
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="🚫 VPNni o‘chirish",
+                    callback_data=f"admin_user_delete_vpn:{vpn_account_id}",
+                ),
+            ]
+        )
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Admin panel",
+                callback_data="admin_user_search_back",
+            ),
         ]
     )
 

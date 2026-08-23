@@ -4,3 +4,4 @@ from .subscription import Subscription
 from .vpn_account import VPNAccount
 from .support_ticket import SupportTicket
 from .support_message import SupportMessage
+from app.models.setting import Setting

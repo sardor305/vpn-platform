@@ -15,11 +15,14 @@ from app.database.database import async_session
 from app.factories.marzban_factory import create_marzban_service
 from app.keyboards.admin import (
     admin_menu,
+    daily_price_keyboard,
     users_menu,
     vpn_account_actions_keyboard,
     vpn_accounts_keyboard,
 )
 from app.keyboards.menu import main_menu
+from app.services.plan_service import PlanService
+from app.services.setting_service import SettingService
 from app.services.statistics_service import StatisticsService
 from app.services.subscription_info_service import SubscriptionInfoService
 from app.services.user_service import UserService
@@ -31,6 +34,9 @@ router = Router()
 
 class AdminSearchStates(StatesGroup):
     waiting_for_user_id = State()
+    waiting_for_custom_plan_days = State()
+    waiting_for_custom_extend_days = State()
+    waiting_for_daily_price = State()
 
 
 async def get_admin(
@@ -108,6 +114,42 @@ def search_result_keyboard(
         ]
     )
 
+def subscription_plans_keyboard(
+    user_id: int,
+    plans,
+) -> InlineKeyboardMarkup:
+
+    buttons = []
+
+    for plan in plans:
+
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=(
+                        f"📦 {plan.name} — "
+                        f"{plan.price} — "
+                        f"{plan.duration_days} kun"
+                    ),
+                    callback_data=(
+                        f"search_plan:{user_id}:{plan.id}"
+                    ),
+                )
+            ]
+        )
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="❌ Bekor qilish",
+                callback_data=f"search_plan_cancel:{user_id}",
+            )
+        ]
+    )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
 
 def format_datetime(
     value,
@@ -664,6 +706,71 @@ async def process_user_search(
 @router.callback_query(
     F.data.startswith("search_refresh:")
 )
+@router.callback_query(
+    F.data.startswith("search_change_plan:")
+)
+async def search_change_plan(
+    callback: CallbackQuery,
+):
+
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+        if user is None:
+
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+
+            return
+
+        plan_service = PlanService(session)
+
+        plans = await plan_service.get_all_active_plans()
+
+    if not plans:
+
+        await callback.answer(
+            "Faol tariflar mavjud emas.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "📦 <b>OBUNANI O‘ZGARTIRISH</b>\n\n"
+        "Yangi tarifni tanlang:",
+        parse_mode="HTML",
+        reply_markup=subscription_plans_keyboard(
+            user_id=user_id,
+            plans=plans,
+        ),
+    )
 async def search_result_refresh(
     callback: CallbackQuery,
 ):
@@ -714,6 +821,59 @@ async def search_result_refresh(
     await show_user_search_result(
         message=callback.message,
         user=user,
+    )
+
+@router.message(F.text == "📦 Tariflar")
+async def tariffs_menu(message: Message):
+
+    admin = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        return
+
+    await message.answer(
+        "📦 <b>TARIFLAR</b>\n\n"
+        "Bu bo‘lim orqali tariflar va kunlik narx sozlamalarini boshqarishingiz mumkin.",
+        parse_mode="HTML",
+        reply_markup=daily_price_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "daily_price:change")
+async def daily_price_change(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer()
+
+    await state.set_state(
+        AdminSearchStates.waiting_for_custom_plan_days
+    )
+
+    await callback.message.answer(
+        "✏️ <b>KUNLIK NARXNI O‘ZGARTIRISH</b>\n\n"
+        "1 kunlik narxni rublda kiriting.\n\n"
+        "Masalan:\n"
+        "<code>10</code>\n"
+        "<code>15</code>\n"
+        "<code>20</code>",
+        parse_mode="HTML",
     )
 
 
