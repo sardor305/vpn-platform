@@ -907,7 +907,7 @@ async def daily_price_change(
     await callback.answer()
 
     await state.set_state(
-        AdminSearchStates.waiting_for_custom_plan_days
+        AdminSearchStates.waiting_for_daily_price
     )
 
     await callback.message.answer(
