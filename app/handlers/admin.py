@@ -74,6 +74,18 @@ async def process_daily_price(
         )
         return
 
+    async with async_session() as session:
+
+        setting_service = SettingService(
+            session=session,
+        )
+
+        await setting_service.set_daily_price(
+            price=daily_price
+        )
+
+        await session.commit()
+
     await state.clear()
 
     await message.answer(
