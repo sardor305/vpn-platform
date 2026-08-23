@@ -39,6 +39,44 @@ class AdminSearchStates(StatesGroup):
     waiting_for_daily_price = State()
 
 
+@router.callback_query(
+    F.data == "daily_price:change"
+)
+async def daily_price_change(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer()
+
+    await state.set_state(
+        AdminSearchStates.waiting_for_daily_price
+    )
+
+    await callback.message.answer(
+        "✏️ <b>KUNLIK NARXNI O‘ZGARTIRISH</b>\n\n"
+        "1 kunlik narxni rublda kiriting.\n\n"
+        "Masalan:\n"
+        "<code>10</code>\n"
+        "<code>15</code>\n"
+        "<code>20</code>",
+        parse_mode="HTML",
+    )
+
+
 @router.message(
     AdminSearchStates.waiting_for_daily_price
 )
@@ -877,59 +915,6 @@ async def search_result_refresh(
     await show_user_search_result(
         message=callback.message,
         user=user,
-    )
-
-@router.message(F.text == "📦 Tariflar")
-async def tariffs_menu(message: Message):
-
-    admin = await get_admin(
-        telegram_id=message.from_user.id
-    )
-
-    if admin is None or not admin.is_admin:
-        return
-
-    await message.answer(
-        "📦 <b>TARIFLAR</b>\n\n"
-        "Bu bo‘lim orqali tariflar va kunlik narx sozlamalarini boshqarishingiz mumkin.",
-        parse_mode="HTML",
-        reply_markup=daily_price_keyboard(),
-    )
-
-
-@router.callback_query(F.data == "daily_price:change")
-async def daily_price_change(
-    callback: CallbackQuery,
-    state: FSMContext,
-):
-
-    admin = await get_admin(
-        telegram_id=callback.from_user.id
-    )
-
-    if admin is None or not admin.is_admin:
-
-        await callback.answer(
-            "Ruxsat yo‘q.",
-            show_alert=True,
-        )
-
-        return
-
-    await callback.answer()
-
-    await state.set_state(
-        AdminSearchStates.waiting_for_daily_price
-    )
-
-    await callback.message.answer(
-        "✏️ <b>KUNLIK NARXNI O‘ZGARTIRISH</b>\n\n"
-        "1 kunlik narxni rublda kiriting.\n\n"
-        "Masalan:\n"
-        "<code>10</code>\n"
-        "<code>15</code>\n"
-        "<code>20</code>",
-        parse_mode="HTML",
     )
 
 
