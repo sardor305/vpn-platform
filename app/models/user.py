@@ -8,6 +8,7 @@ from app.database.base import Base
 if TYPE_CHECKING:
     from app.models.subscription import Subscription
     from app.models.vpn_account import VPNAccount
+    from app.models.daily_subscription import DailySubscription
 
 
 class User(Base):
@@ -65,5 +66,11 @@ class User(Base):
     )
 
     vpn_accounts: Mapped[list["VPNAccount"]] = relationship(
+        back_populates="user",
+    )
+
+    daily_subscriptions: Mapped[
+        list["DailySubscription"]
+    ] = relationship(
         back_populates="user",
     )
