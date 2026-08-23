@@ -39,6 +39,50 @@ class AdminSearchStates(StatesGroup):
     waiting_for_daily_price = State()
 
 
+@router.message(
+    AdminSearchStates.waiting_for_daily_price
+)
+async def process_daily_price(
+    message: Message,
+    state: FSMContext,
+):
+
+    admin = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await state.clear()
+        return
+
+    value = (message.text or "").strip()
+
+    if not value.isdigit():
+        await message.answer(
+            "❌ Faqat raqam kiriting.\n\n"
+            "Masalan: <code>10</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    daily_price = int(value)
+
+    if daily_price <= 0:
+        await message.answer(
+            "❌ Narx 0 dan katta bo‘lishi kerak.",
+            parse_mode="HTML",
+        )
+        return
+
+    await state.clear()
+
+    await message.answer(
+        f"✅ 1 kunlik narx: <b>{daily_price} RUB</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+
+
 async def get_admin(
     telegram_id: int,
 ):
