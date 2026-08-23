@@ -12,6 +12,7 @@ from app.keyboards.plan_admin import (
 )
 from app.services.plan_service import PlanService
 from app.services.user_service import UserService
+from app.services.setting_service import SettingService
 from app.states.plan import PlanStates
 
 
@@ -52,10 +53,16 @@ async def admin_plans(
 
         plans = await plan_service.get_all_plans()
 
+        setting_service = SettingService(session)
+
+        daily_price = await setting_service.get_daily_price()
+
     if not plans:
 
         await message.answer(
             "📦 <b>Tariflar</b>\n\n"
+            f"💰 1 kunlik narx: "
+            f"<b>{daily_price} RUB</b>\n\n"
             "Hozircha tariflar mavjud emas.",
             parse_mode="HTML",
             reply_markup=admin_menu,
@@ -65,6 +72,8 @@ async def admin_plans(
 
     await message.answer(
         "📦 <b>Tariflar</b>\n\n"
+        f"💰 1 kunlik narx: "
+        f"<b>{daily_price} RUB</b>\n\n"
         "Kerakli tarifni tanlang:",
         parse_mode="HTML",
         reply_markup=admin_plans_keyboard(plans),
