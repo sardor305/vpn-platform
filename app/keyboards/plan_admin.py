@@ -36,6 +36,13 @@ def admin_plans_keyboard(
 
     buttons.append([
         InlineKeyboardButton(
+            text="✏️ Kunlik narxni o‘zgartirish",
+            callback_data="daily_price:change",
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
             text="⬅️ Admin panel",
             callback_data="admin_plan_back",
         )
