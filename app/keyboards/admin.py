@@ -68,7 +68,7 @@ def vpn_accounts_keyboard(
 
     for account in accounts:
 
-        user = account.subscription.user
+        user = account.user
 
         full_name = user.first_name
 
