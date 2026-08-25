@@ -46,5 +46,5 @@ def daily_subscription_keyboard(
     ])
 
     return InlineKeyboardMarkup(
-        inline_keyboard=buttons
+        inline_keyboard=buttons,
     )
