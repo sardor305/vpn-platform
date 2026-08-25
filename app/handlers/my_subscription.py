@@ -19,7 +19,9 @@ async def my_subscription(message: Message):
     async with async_session() as session:
 
         user_service = UserService(session)
-        subscription_info_service = SubscriptionInfoService(session)
+        subscription_info_service = SubscriptionInfoService(
+            session
+        )
 
         user, _ = await user_service.get_or_create_user(
             telegram_id=message.from_user.id,
@@ -37,17 +39,81 @@ async def my_subscription(message: Message):
 
             await message.answer(
                 "❌ Sizda faol obuna mavjud emas.\n\n"
-                "🛒 \"Obuna sotib olish\" bo'limidan tarif tanlang."
+                "🛒 \"Obuna sotib olish\" bo‘limidan "
+                "tarif tanlang."
             )
 
             return
 
         subscription = info["subscription"]
+        daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
+
+    if subscription is not None:
+
+        status = (
+            "🟢 Faol"
+            if subscription.status == "active"
+            else "🔴 Faol emas"
+        )
+
+        if vpn_account is None:
+
+            await message.answer(
+                f"👤 <b>Mening obunam</b>\n\n"
+                f"📦 Tarif: "
+                f"<b>{subscription.plan.name}</b>\n"
+                f"💰 Narxi: "
+                f"<b>{subscription.plan.price} ₽</b>\n\n"
+                f"📅 Boshlangan sana:\n"
+                f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+                f"⏳ Tugash sanasi:\n"
+                f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+                f"{status}\n\n"
+                f"⚠️ <b>VPN hisob mavjud emas.</b>\n\n"
+                f"Faol obunangiz uchun yangi VPN hisob "
+                f"yaratish uchun quyidagi tugmani bosing.",
+                parse_mode="HTML",
+                reply_markup=subscription_keyboard(
+                    show_create_vpn=True,
+                ),
+            )
+
+            return
+
+        subscription_url = (
+            f"{config.MARZBAN_PUBLIC_URL}"
+            f"{vpn_account.subscription_url}"
+        )
+
+        await message.answer(
+            f"👤 <b>Mening obunam</b>\n\n"
+            f"📦 Tarif: "
+            f"<b>{subscription.plan.name}</b>\n"
+            f"💰 Narxi: "
+            f"<b>{subscription.plan.price} ₽</b>\n\n"
+            f"👤 Username:\n"
+            f"<code>{vpn_account.marzban_username}</code>\n\n"
+            f"📅 Boshlangan sana:\n"
+            f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+            f"⏳ Tugash sanasi:\n"
+            f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+            f"{status}\n\n"
+            f"🔗 <b>VLESS havola:</b>\n"
+            f"<code>{vpn_account.vpn_link}</code>",
+            parse_mode="HTML",
+            reply_markup=subscription_keyboard(
+                subscription_url=subscription_url,
+            ),
+        )
+
+        return
+
+    # Daily subscription
 
     status = (
         "🟢 Faol"
-        if subscription.status == "active"
+        if daily_subscription.status == "active"
         else "🔴 Faol emas"
     )
 
@@ -55,16 +121,19 @@ async def my_subscription(message: Message):
 
         await message.answer(
             f"👤 <b>Mening obunam</b>\n\n"
-            f"📦 Tarif: <b>{subscription.plan.name}</b>\n"
-            f"💰 Narxi: <b>{subscription.plan.price} ₽</b>\n\n"
+            f"📅 Obuna turi: <b>Kunlik</b>\n"
+            f"⏳ Muddat: "
+            f"<b>{daily_subscription.duration_days} kun</b>\n"
+            f"💰 Narxi: "
+            f"<b>{daily_subscription.price} ₽</b>\n\n"
             f"📅 Boshlangan sana:\n"
-            f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+            f"{daily_subscription.start_date.strftime('%d.%m.%Y')}\n\n"
             f"⏳ Tugash sanasi:\n"
-            f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+            f"{daily_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
             f"{status}\n\n"
             f"⚠️ <b>VPN hisob mavjud emas.</b>\n\n"
-            f"Faol obunangiz uchun yangi VPN hisob yaratish "
-            f"uchun quyidagi tugmani bosing.",
+            f"Faol obunangiz uchun yangi VPN hisob "
+            f"yaratish uchun quyidagi tugmani bosing.",
             parse_mode="HTML",
             reply_markup=subscription_keyboard(
                 show_create_vpn=True,
@@ -80,14 +149,17 @@ async def my_subscription(message: Message):
 
     await message.answer(
         f"👤 <b>Mening obunam</b>\n\n"
-        f"📦 Tarif: <b>{subscription.plan.name}</b>\n"
-        f"💰 Narxi: <b>{subscription.plan.price} ₽</b>\n\n"
+        f"📅 Obuna turi: <b>Kunlik</b>\n"
+        f"⏳ Muddat: "
+        f"<b>{daily_subscription.duration_days} kun</b>\n"
+        f"💰 Narxi: "
+        f"<b>{daily_subscription.price} ₽</b>\n\n"
         f"👤 Username:\n"
         f"<code>{vpn_account.marzban_username}</code>\n\n"
         f"📅 Boshlangan sana:\n"
-        f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+        f"{daily_subscription.start_date.strftime('%d.%m.%Y')}\n\n"
         f"⏳ Tugash sanasi:\n"
-        f"{subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+        f"{daily_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
         f"{status}\n\n"
         f"🔗 <b>VLESS havola:</b>\n"
         f"<code>{vpn_account.vpn_link}</code>",
@@ -110,7 +182,9 @@ async def create_vpn_for_subscription(
     async with async_session() as session:
 
         user_service = UserService(session)
-        subscription_info_service = SubscriptionInfoService(session)
+        subscription_info_service = SubscriptionInfoService(
+            session
+        )
 
         user, _ = await user_service.get_or_create_user(
             telegram_id=callback.from_user.id,
@@ -128,12 +202,14 @@ async def create_vpn_for_subscription(
 
             await callback.message.edit_text(
                 "❌ Sizda faol obuna mavjud emas.\n\n"
-                "🛒 \"Obuna sotib olish\" bo'limidan tarif tanlang."
+                "🛒 \"Obuna sotib olish\" bo‘limidan "
+                "tarif tanlang."
             )
 
             return
 
         subscription = info["subscription"]
+        daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
 
         if vpn_account is not None:
@@ -143,20 +219,50 @@ async def create_vpn_for_subscription(
                 f"{vpn_account.subscription_url}"
             )
 
-            await callback.message.edit_text(
-                f"👤 <b>Mening obunam</b>\n\n"
-                f"📦 Tarif: <b>{subscription.plan.name}</b>\n\n"
-                f"👤 Username:\n"
-                f"<code>{vpn_account.marzban_username}</code>\n\n"
-                f"🔗 <b>VLESS havola:</b>\n"
-                f"<code>{vpn_account.vpn_link}</code>",
-                parse_mode="HTML",
-                reply_markup=subscription_keyboard(
-                    subscription_url=subscription_url,
-                ),
-            )
+            if subscription is not None:
+
+                await callback.message.edit_text(
+                    f"👤 <b>Mening obunam</b>\n\n"
+                    f"📦 Tarif: "
+                    f"<b>{subscription.plan.name}</b>\n\n"
+                    f"👤 Username:\n"
+                    f"<code>{vpn_account.marzban_username}</code>\n\n"
+                    f"🔗 <b>VLESS havola:</b>\n"
+                    f"<code>{vpn_account.vpn_link}</code>",
+                    parse_mode="HTML",
+                    reply_markup=subscription_keyboard(
+                        subscription_url=subscription_url,
+                    ),
+                )
+
+            else:
+
+                await callback.message.edit_text(
+                    f"👤 <b>Mening obunam</b>\n\n"
+                    f"📅 Obuna turi: <b>Kunlik</b>\n"
+                    f"⏳ Muddat: "
+                    f"<b>{daily_subscription.duration_days} kun</b>\n"
+                    f"💰 Narxi: "
+                    f"<b>{daily_subscription.price} ₽</b>\n\n"
+                    f"👤 Username:\n"
+                    f"<code>{vpn_account.marzban_username}</code>\n\n"
+                    f"🔗 <b>VLESS havola:</b>\n"
+                    f"<code>{vpn_account.vpn_link}</code>",
+                    parse_mode="HTML",
+                    reply_markup=subscription_keyboard(
+                        subscription_url=subscription_url,
+                    ),
+                )
 
             return
+
+        if subscription is not None:
+
+            end_date = subscription.end_date
+
+        else:
+
+            end_date = daily_subscription.end_date
 
         vpn_account_service = VPNAccountService(
             session=session,
@@ -165,10 +271,12 @@ async def create_vpn_for_subscription(
 
         try:
 
-            vpn_account = await vpn_account_service.get_or_create(
-                user_id=user.id,
-                end_date=subscription.end_date,
-                protocol="vless",
+            vpn_account = (
+                await vpn_account_service.get_or_create(
+                    user_id=user.id,
+                    end_date=end_date,
+                    protocol="vless",
+                )
             )
 
             await session.commit()
@@ -194,14 +302,37 @@ async def create_vpn_for_subscription(
         f"{vpn_account.subscription_url}"
     )
 
-    await callback.message.edit_text(
-        f"🎉 <b>VPN hisob muvaffaqiyatli yaratildi!</b>\n\n"
-        f"👤 Username:\n"
-        f"<code>{vpn_account.marzban_username}</code>\n\n"
-        f"🔗 <b>VLESS havola:</b>\n"
-        f"<code>{vpn_account.vpn_link}</code>",
-        parse_mode="HTML",
-        reply_markup=subscription_keyboard(
-            subscription_url=subscription_url,
-        ),
-    )
+    if subscription is not None:
+
+        await callback.message.edit_text(
+            f"👤 <b>Mening obunam</b>\n\n"
+            f"📦 Tarif: "
+            f"<b>{subscription.plan.name}</b>\n\n"
+            f"👤 Username:\n"
+            f"<code>{vpn_account.marzban_username}</code>\n\n"
+            f"🔗 <b>VLESS havola:</b>\n"
+            f"<code>{vpn_account.vpn_link}</code>",
+            parse_mode="HTML",
+            reply_markup=subscription_keyboard(
+                subscription_url=subscription_url,
+            ),
+        )
+
+    else:
+
+        await callback.message.edit_text(
+            f"👤 <b>Mening obunam</b>\n\n"
+            f"📅 Obuna turi: <b>Kunlik</b>\n"
+            f"⏳ Muddat: "
+            f"<b>{daily_subscription.duration_days} kun</b>\n"
+            f"💰 Narxi: "
+            f"<b>{daily_subscription.price} ₽</b>\n\n"
+            f"👤 Username:\n"
+            f"<code>{vpn_account.marzban_username}</code>\n\n"
+            f"🔗 <b>VLESS havola:</b>\n"
+            f"<code>{vpn_account.vpn_link}</code>",
+            parse_mode="HTML",
+            reply_markup=subscription_keyboard(
+                subscription_url=subscription_url,
+            ),
+        )
