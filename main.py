@@ -14,6 +14,9 @@ from app.handlers.buy import router as buy_router
 from app.handlers.tariff_selection import (
     router as tariff_selection_router,
 )
+from app.handlers.daily_subscription import (
+    router as daily_subscription_router,
+)
 from app.handlers.my_subscription import (
     router as my_subscription_router,
 )
@@ -37,6 +40,7 @@ dp.include_router(support_router)
 dp.include_router(support_admin_router)
 dp.include_router(buy_router)
 dp.include_router(tariff_selection_router)
+dp.include_router(daily_subscription_router)
 dp.include_router(my_subscription_router)
 dp.include_router(admin_router)
 dp.include_router(plan_admin_router)

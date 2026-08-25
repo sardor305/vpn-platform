@@ -9,12 +9,14 @@ from app.services.user_service import UserService
 router = Router()
 
 
-@router.callback_query(F.data.startswith("buy:"))
-async def select_tariff(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("daily_buy:"))
+async def buy_daily_subscription(
+    callback: CallbackQuery,
+):
 
     await callback.answer()
 
-    plan_id = int(
+    duration_days = int(
         callback.data.split(":")[1]
     )
 
@@ -31,9 +33,9 @@ async def select_tariff(callback: CallbackQuery):
             language_code=callback.from_user.language_code,
         )
 
-        result = await purchase_service.purchase_plan(
+        result = await purchase_service.purchase_daily(
             user_id=user.id,
-            plan_id=plan_id,
+            duration_days=duration_days,
         )
 
         if result.success:
@@ -49,14 +51,17 @@ async def select_tariff(callback: CallbackQuery):
 
         return
 
+    daily_subscription = result.daily_subscription
+
     text = (
         "🎉 <b>VPN muvaffaqiyatli yaratildi!</b>\n\n"
-        f"📦 <b>Tarif:</b> "
-        f"{result.plan.name}\n"
+        "📅 <b>Obuna turi:</b> Kunlik\n"
+        f"⏳ <b>Muddat:</b> "
+        f"{daily_subscription.duration_days} kun\n"
         f"💰 <b>Narxi:</b> "
-        f"{result.plan.price} ₽\n"
+        f"{daily_subscription.price} ₽\n"
         f"📅 <b>Amal qilish muddati:</b> "
-        f"{result.subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+        f"{daily_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
         "🔗 <b>VLESS havola:</b>\n"
         f"<code>{result.vpn_link}</code>\n\n"
         "🔄 <b>Subscription:</b>\n"

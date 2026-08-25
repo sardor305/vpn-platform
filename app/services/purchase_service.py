@@ -2,6 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.factories.marzban_factory import create_marzban_service
 from app.schemas.purchase_result import PurchaseResult
+from app.services.daily_subscription_service import (
+    DailySubscriptionService,
+)
 from app.services.payment_service import PaymentService
 from app.services.plan_service import PlanService
 from app.services.subscription_service import SubscriptionService
@@ -17,6 +20,9 @@ class PurchaseService:
     ):
         self.user_service = UserService(session)
         self.plan_service = PlanService(session)
+        self.daily_subscription_service = (
+            DailySubscriptionService(session)
+        )
         self.payment_service = PaymentService()
         self.subscription_service = SubscriptionService(session)
 
@@ -27,7 +33,7 @@ class PurchaseService:
             marzban_service=self.marzban_service,
         )
 
-    async def purchase(
+    async def purchase_plan(
         self,
         user_id: int,
         plan_id: int,
@@ -41,7 +47,9 @@ class PurchaseService:
                 message="Tarif topilmadi.",
             )
 
-        payment = await self.payment_service.create_test_payment()
+        payment = (
+            await self.payment_service.create_test_payment()
+        )
 
         if not payment.success:
             return PurchaseResult(
@@ -49,21 +57,30 @@ class PurchaseService:
                 message=payment.message,
             )
 
-        subscription = await self.subscription_service.get_active_subscription(
-            user_id
+        subscription = (
+            await self.subscription_service
+            .get_active_subscription(user_id)
         )
 
         if subscription is not None:
-            subscription = await self.subscription_service.extend_subscription(
-                subscription=subscription,
-                plan_id=plan.id,
-                duration_days=plan.duration_days,
+
+            subscription = (
+                await self.subscription_service
+                .extend_subscription(
+                    subscription=subscription,
+                    duration_days=plan.duration_days,
+                )
             )
+
         else:
-            subscription = await self.subscription_service.create_subscription(
-                user_id=user_id,
-                plan_id=plan.id,
-                duration_days=plan.duration_days,
+
+            subscription = (
+                await self.subscription_service
+                .create_subscription(
+                    user_id=user_id,
+                    plan_id=plan.id,
+                    duration_days=plan.duration_days,
+                )
             )
 
         user = await self.user_service.get_by_id(user_id)
@@ -74,10 +91,12 @@ class PurchaseService:
                 message="Foydalanuvchi topilmadi.",
             )
 
-        vpn_account = await self.vpn_account_service.get_or_create(
-            user_id=user.id,
-            end_date=subscription.end_date,
-            protocol="vless",
+        vpn_account = (
+            await self.vpn_account_service.get_or_create(
+                user_id=user.id,
+                end_date=subscription.end_date,
+                protocol="vless",
+            )
         )
 
         return PurchaseResult(
@@ -85,6 +104,99 @@ class PurchaseService:
             message="Obuna muvaffaqiyatli rasmiylashtirildi.",
             plan=plan,
             subscription=subscription,
+            vpn_link=vpn_account.vpn_link,
+            subscription_url=vpn_account.subscription_url,
+        )
+
+    async def purchase_daily(
+        self,
+        user_id: int,
+        duration_days: int,
+    ) -> PurchaseResult:
+
+        if duration_days <= 0:
+            return PurchaseResult(
+                success=False,
+                message="Obuna muddati noto‘g‘ri.",
+            )
+
+        plan_subscription = (
+            await self.subscription_service
+            .get_active_subscription(user_id)
+        )
+
+        if plan_subscription is not None:
+            return PurchaseResult(
+                success=False,
+                message=(
+                    "🟢 Faol obunangiz mavjud.\n\n"
+                    f"📦 Tarif: "
+                    f"{plan_subscription.plan.name}\n"
+                    f"📅 Tugash sanasi: "
+                    f"{plan_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+                    "Yangi kunlik obuna olish uchun\n"
+                    "avvalgi obunangiz tugashini kuting."
+                ),
+            )
+
+        daily_subscription = (
+            await self.daily_subscription_service
+            .get_active_subscription(user_id)
+        )
+
+        if daily_subscription is not None:
+            return PurchaseResult(
+                success=False,
+                message=(
+                    "🟢 Faol kunlik obunangiz mavjud.\n\n"
+                    f"📅 Tugash sanasi: "
+                    f"{daily_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+                    "Yangi kunlik obuna olish uchun\n"
+                    "avvalgi obunangiz tugashini kuting."
+                ),
+            )
+
+        payment = (
+            await self.payment_service.create_test_payment()
+        )
+
+        if not payment.success:
+            return PurchaseResult(
+                success=False,
+                message=payment.message,
+            )
+
+        user = await self.user_service.get_by_id(user_id)
+
+        if user is None:
+            return PurchaseResult(
+                success=False,
+                message="Foydalanuvchi topilmadi.",
+            )
+
+        daily_subscription = (
+            await self.daily_subscription_service
+            .create_subscription(
+                user_id=user.id,
+                duration_days=duration_days,
+            )
+        )
+
+        vpn_account = (
+            await self.vpn_account_service.get_or_create(
+                user_id=user.id,
+                end_date=daily_subscription.end_date,
+                protocol="vless",
+            )
+        )
+
+        return PurchaseResult(
+            success=True,
+            message=(
+                "Kunlik obuna muvaffaqiyatli "
+                "rasmiylashtirildi."
+            ),
+            daily_subscription=daily_subscription,
             vpn_link=vpn_account.vpn_link,
             subscription_url=vpn_account.subscription_url,
         )
