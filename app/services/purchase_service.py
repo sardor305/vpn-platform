@@ -20,11 +20,16 @@ class PurchaseService:
     ):
         self.user_service = UserService(session)
         self.plan_service = PlanService(session)
+
         self.daily_subscription_service = (
             DailySubscriptionService(session)
         )
+
         self.payment_service = PaymentService()
-        self.subscription_service = SubscriptionService(session)
+
+        self.subscription_service = SubscriptionService(
+            session
+        )
 
         self.marzban_service = create_marzban_service()
 
@@ -45,6 +50,23 @@ class PurchaseService:
             return PurchaseResult(
                 success=False,
                 message="Tarif topilmadi.",
+            )
+
+        daily_subscription = (
+            await self.daily_subscription_service
+            .get_active_subscription(user_id)
+        )
+
+        if daily_subscription is not None:
+            return PurchaseResult(
+                success=False,
+                message=(
+                    "🟢 Faol kunlik obunangiz mavjud.\n\n"
+                    f"📅 Tugash sanasi: "
+                    f"{daily_subscription.end_date.strftime('%d.%m.%Y')}\n\n"
+                    "Yangi tarif sotib olish uchun\n"
+                    "kunlik obunangiz tugashini kuting."
+                ),
             )
 
         payment = (
@@ -92,7 +114,8 @@ class PurchaseService:
             )
 
         vpn_account = (
-            await self.vpn_account_service.get_or_create(
+            await self.vpn_account_service
+            .get_or_create(
                 user_id=user.id,
                 end_date=subscription.end_date,
                 protocol="vless",
@@ -157,7 +180,8 @@ class PurchaseService:
             )
 
         payment = (
-            await self.payment_service.create_test_payment()
+            await self.payment_service
+            .create_test_payment()
         )
 
         if not payment.success:
@@ -183,7 +207,8 @@ class PurchaseService:
         )
 
         vpn_account = (
-            await self.vpn_account_service.get_or_create(
+            await self.vpn_account_service
+            .get_or_create(
                 user_id=user.id,
                 end_date=daily_subscription.end_date,
                 protocol="vless",
