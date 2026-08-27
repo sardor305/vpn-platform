@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.subscription import Subscription
 
@@ -14,7 +14,7 @@ class SubscriptionRepository:
 
     async def get_active_by_user(
         self,
-        user_id: int
+        user_id: int,
     ) -> Subscription | None:
 
         now = datetime.now()
@@ -34,6 +34,28 @@ class SubscriptionRepository:
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def get_all_active(
+        self,
+    ) -> list[Subscription]:
+
+        now = datetime.now()
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.user),
+                selectinload(Subscription.plan),
+            )
+            .where(
+                Subscription.status == "active",
+                Subscription.end_date > now,
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
 
     async def create(
         self,
