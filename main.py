@@ -24,6 +24,9 @@ from app.handlers.admin import router as admin_router
 from app.handlers.plan_admin import (
     router as plan_admin_router,
 )
+from app.tasks.subscription_scheduler import (
+    subscription_reminder_scheduler,
+)
 
 
 bot = Bot(
@@ -54,7 +57,24 @@ async def main():
 
     print("2. DB tekshirildi")
 
-    await dp.start_polling(bot)
+    scheduler_task = asyncio.create_task(
+        subscription_reminder_scheduler(bot)
+    )
+
+    print("3. Subscription reminder scheduler ishga tushdi")
+
+    try:
+
+        await dp.start_polling(bot)
+
+    finally:
+
+        scheduler_task.cancel()
+
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":
