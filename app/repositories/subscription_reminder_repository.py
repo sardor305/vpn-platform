@@ -1,9 +1,8 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription_reminder import SubscriptionReminder
+from app.utils.datetime import utc_now
 
 
 class SubscriptionReminderRepository:
@@ -40,7 +39,7 @@ class SubscriptionReminderRepository:
         reminder = SubscriptionReminder(
             subscription_id=subscription_id,
             reminder_type=reminder_type,
-            sent_at=datetime.now(),
+            sent_at=utc_now(),
         )
 
         self.session.add(reminder)

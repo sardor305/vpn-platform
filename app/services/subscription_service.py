@@ -6,6 +6,7 @@ from app.models.subscription import Subscription
 from app.repositories.subscription_repository import (
     SubscriptionRepository,
 )
+from app.utils.datetime import utc_now
 
 
 class SubscriptionService:
@@ -41,7 +42,7 @@ class SubscriptionService:
         duration_days: int,
     ) -> Subscription:
 
-        start_date = datetime.now()
+        start_date = utc_now()
 
         end_date = start_date + timedelta(
             days=duration_days

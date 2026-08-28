@@ -1,9 +1,8 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.daily_subscription import DailySubscription
+from app.utils.datetime import utc_now
 
 
 class DailySubscriptionRepository:
@@ -16,7 +15,7 @@ class DailySubscriptionRepository:
         user_id: int,
     ) -> DailySubscription | None:
 
-        now = datetime.now()
+        now = utc_now()
 
         stmt = (
             select(DailySubscription)

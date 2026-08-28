@@ -6,6 +6,7 @@ from app.models.support_ticket import SupportTicket
 from app.repositories.support_ticket_repository import (
     SupportTicketRepository,
 )
+from app.utils.datetime import utc_now
 
 
 class SupportTicketService:
@@ -80,7 +81,7 @@ class SupportTicketService:
         )
 
         if ticket is not None:
-            ticket.closed_at = datetime.now()
+            ticket.closed_at = utc_now()
 
         return ticket
 
@@ -94,6 +95,6 @@ class SupportTicketService:
         )
 
         if ticket is not None:
-            ticket.deleted_at = datetime.now()
+            ticket.deleted_at = utc_now()
 
         return ticket

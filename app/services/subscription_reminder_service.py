@@ -7,6 +7,7 @@ from app.repositories.subscription_reminder_repository import (
     SubscriptionReminderRepository,
 )
 from app.services.subscription_service import SubscriptionService
+from app.utils.datetime import utc_now
 
 
 class SubscriptionReminderService:
@@ -35,7 +36,7 @@ class SubscriptionReminderService:
             .get_all_active_subscriptions()
         )
 
-        now = datetime.now()
+        now = utc_now()
 
         reminder_min = now + timedelta(days=2)
         reminder_max = now + timedelta(days=3)

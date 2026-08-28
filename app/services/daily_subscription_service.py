@@ -7,6 +7,7 @@ from app.repositories.daily_subscription_repository import (
     DailySubscriptionRepository,
 )
 from app.services.setting_service import SettingService
+from app.utils.datetime import utc_now
 
 
 class DailySubscriptionService:
@@ -45,7 +46,7 @@ class DailySubscriptionService:
         duration_days: int,
     ) -> DailySubscription:
 
-        start_date = datetime.now()
+        start_date = utc_now()
 
         end_date = start_date + timedelta(
             days=duration_days

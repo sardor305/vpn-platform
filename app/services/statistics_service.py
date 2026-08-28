@@ -6,6 +6,7 @@ from app.repositories.statistics_repository import (
     StatisticsRepository,
 )
 from app.schemas.statistics import StatisticsResult
+from app.utils.datetime import utc_now
 
 
 class StatisticsService:
@@ -22,7 +23,7 @@ class StatisticsService:
         self,
     ) -> StatisticsResult:
 
-        now = datetime.now()
+        now = utc_now()
 
         start_of_day = now.replace(
             hour=0,

@@ -5,6 +5,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from app.utils.datetime import utc_now
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -45,7 +46,7 @@ class SupportTicket(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.now,
+        default=utc_now,
     )
 
     closed_at: Mapped[datetime | None] = mapped_column(

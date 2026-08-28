@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.subscription import Subscription
+from app.utils.datetime import utc_now
 
 
 class SubscriptionRepository:
@@ -17,7 +18,7 @@ class SubscriptionRepository:
         user_id: int,
     ) -> Subscription | None:
 
-        now = datetime.now()
+        now = utc_now()
 
         stmt = (
             select(Subscription)
@@ -39,7 +40,7 @@ class SubscriptionRepository:
         self,
     ) -> list[Subscription]:
 
-        now = datetime.now()
+        now = utc_now()
 
         stmt = (
             select(Subscription)
