@@ -49,6 +49,19 @@ async def my_subscription(message: Message):
         daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
 
+        if (
+            subscription is None
+            and daily_subscription is None
+        ):
+
+            await message.answer(
+                "❌ Sizda faol obuna mavjud emas.\n\n"
+                "🛒 \"Obuna sotib olish\" bo‘limidan "
+                "tarif tanlang."
+            )
+
+            return
+
     if subscription is not None:
 
         status = (
