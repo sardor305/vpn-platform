@@ -46,9 +46,6 @@ class SubscriptionInfoService:
                 .get_active_subscription(user_id)
             )
 
-            if daily_subscription is None:
-                return None
-
         vpn_account = (
             await self.vpn_account_service.get_existing(
                 user_id=user_id,
