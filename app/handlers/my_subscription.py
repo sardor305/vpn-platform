@@ -124,6 +124,16 @@ async def my_subscription(message: Message):
 
     # Daily subscription
 
+    if daily_subscription is None:
+
+        await message.answer(
+            "❌ Sizda faol obuna mavjud emas.\n\n"
+            "🛒 \"Obuna sotib olish\" bo‘limidan "
+            "tarif tanlang."
+        )
+
+        return
+
     status = (
         "🟢 Faol"
         if daily_subscription.status == "active"
@@ -225,6 +235,19 @@ async def create_vpn_for_subscription(
         daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
 
+        if (
+            subscription is None
+            and daily_subscription is None
+        ):
+
+            await callback.message.edit_text(
+                "❌ Sizda faol obuna mavjud emas.\n\n"
+                "🛒 \"Obuna sotib olish\" bo‘limidan "
+                "tarif tanlang."
+            )
+
+            return
+
         if vpn_account is not None:
 
             subscription_url = (
@@ -273,9 +296,19 @@ async def create_vpn_for_subscription(
 
             end_date = subscription.end_date
 
-        else:
+        elif daily_subscription is not None:
 
             end_date = daily_subscription.end_date
+
+        else:
+
+            await callback.message.edit_text(
+                "❌ Sizda faol obuna mavjud emas.\n\n"
+                "🛒 \"Obuna sotib olish\" bo‘limidan "
+                "tarif tanlang."
+            )
+
+            return
 
         vpn_account_service = VPNAccountService(
             session=session,
