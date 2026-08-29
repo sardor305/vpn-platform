@@ -38,6 +38,16 @@ class VPNAccountService:
                 expire=end_date,
             )
 
+            if not vpn_account.is_active:
+
+                await self.marzban_service.activate_user(
+                    username=vpn_account.marzban_username,
+                )
+
+                vpn_account = await self.repository.activate(
+                    vpn_account
+                )
+
             return vpn_account
 
         username = self.username_service.generate(
