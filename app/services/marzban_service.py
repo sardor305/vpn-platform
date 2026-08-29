@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from httpx import HTTPStatusError
 
@@ -29,6 +29,11 @@ class MarzbanService:
     def _datetime_to_timestamp(
         value: datetime,
     ) -> int:
+
+        if value.tzinfo is None:
+            value = value.replace(
+                tzinfo=timezone.utc
+            )
 
         return int(value.timestamp())
 
