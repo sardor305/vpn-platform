@@ -266,4 +266,4 @@ async def subscription_reminder_scheduler(
                 repr(e),
             )
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(60 * 60)
