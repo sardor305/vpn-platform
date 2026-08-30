@@ -100,6 +100,15 @@ async def check_expired_vpn_accounts(
 
                 subscription_expire = end_date
 
+            # Marzban expire faqat sekund aniqligida saqlanadi.
+            # PostgreSQL esa mikrosekundlarni saqlashi mumkin.
+            # Shuning uchun subscription sanasini sekundgacha
+            # normalize qilamiz.
+
+            subscription_expire = subscription_expire.replace(
+                microsecond=0
+            )
+
             # 1. Platformadagi obuna muddati tugagan bo'lsa,
             # VPN accountni deaktivatsiya qilamiz.
 
