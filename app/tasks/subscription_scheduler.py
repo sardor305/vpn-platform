@@ -36,21 +36,126 @@ async def check_expired_vpn_accounts(
 
         try:
 
+            user = account.user
+
+            subscription = None
+
+            active_subscriptions = [
+                item
+                for item in user.subscriptions
+                if item.status == "active"
+            ]
+
+            if active_subscriptions:
+
+                subscription = max(
+                    active_subscriptions,
+                    key=lambda item: item.end_date,
+                )
+
+            daily_subscription = None
+
+            active_daily_subscriptions = [
+                item
+                for item in user.daily_subscriptions
+                if item.status == "active"
+            ]
+
+            if active_daily_subscriptions:
+
+                daily_subscription = max(
+                    active_daily_subscriptions,
+                    key=lambda item: item.end_date,
+                )
+
+            # Oddiy Subscription ustun.
+            # Agar oddiy Subscription mavjud bo'lmasa,
+            # DailySubscription ishlatiladi.
+
+            if subscription is not None:
+
+                end_date = subscription.end_date
+
+            elif daily_subscription is not None:
+
+                end_date = daily_subscription.end_date
+
+            else:
+
+                print(
+                    "VPN EXPIRY CHECK: "
+                    f"User uchun faol obuna topilmadi: "
+                    f"{account.marzban_username}"
+                )
+
+                continue
+
+            if end_date.tzinfo is None:
+
+                subscription_expire = end_date.replace(
+                    tzinfo=timezone.utc
+                )
+
+            else:
+
+                subscription_expire = end_date
+
+            # 1. Platformadagi obuna muddati tugagan bo'lsa,
+            # VPN accountni deaktivatsiya qilamiz.
+
+            if subscription_expire <= now:
+
+                print(
+                    "VPN EXPIRY: "
+                    f"{account.marzban_username} "
+                    f"platforma obunasi muddati tugagan. "
+                    f"Expire: "
+                    f"{subscription_expire.isoformat()}"
+                )
+
+                await vpn_account_service.deactivate_account(
+                    account_id=account.id,
+                )
+
+                deactivated_count += 1
+
+                print(
+                    "VPN DEACTIVATED: "
+                    f"{account.marzban_username}"
+                )
+
+                continue
+
+            # 2. Subscription hali faol.
+            # Marzban expire sanasini platformadagi
+            # subscription end_date bilan sinxronlaymiz.
+
             marzban_user = await marzban_service.get_user(
                 username=account.marzban_username,
             )
 
             if marzban_user is None:
+
                 print(
                     "VPN EXPIRY CHECK: "
-                    f"Marzban user topilmadi: "
+                    "Marzban user topilmadi: "
                     f"{account.marzban_username}"
                 )
+
                 continue
 
-            expire_timestamp = marzban_user.get("expire")
+            expire_timestamp = marzban_user.get(
+                "expire"
+            )
 
             if expire_timestamp is None:
+
+                print(
+                    "VPN EXPIRY CHECK: "
+                    "Marzban expire mavjud emas: "
+                    f"{account.marzban_username}"
+                )
+
                 continue
 
             expire_date = datetime.fromtimestamp(
@@ -58,25 +163,32 @@ async def check_expired_vpn_accounts(
                 timezone.utc,
             )
 
-            if expire_date > now:
-                continue
+            # Marzban expire va platforma obunasi
+            # bir-biridan farq qilsa, platforma sanasi
+            # asosida Marzban'ni yangilaymiz.
 
-            print(
-                "VPN EXPIRY: "
-                f"{account.marzban_username} muddati tugagan. "
-                f"Expire: {expire_date.isoformat()}"
-            )
+            if expire_date != subscription_expire:
 
-            await vpn_account_service.deactivate_account(
-                account_id=account.id,
-            )
+                print(
+                    "VPN SYNC: "
+                    f"{account.marzban_username} "
+                    "Marzban expire yangilanmoqda."
+                )
 
-            deactivated_count += 1
+                print(
+                    "VPN SYNC OLD: "
+                    f"{expire_date.isoformat()}"
+                )
 
-            print(
-                "VPN DEACTIVATED: "
-                f"{account.marzban_username}"
-            )
+                print(
+                    "VPN SYNC NEW: "
+                    f"{subscription_expire.isoformat()}"
+                )
+
+                await marzban_service.update_user_expire(
+                    username=account.marzban_username,
+                    expire=subscription_expire,
+                )
 
         except Exception as e:
 
@@ -124,16 +236,18 @@ async def subscription_reminder_scheduler(
                 await session.commit()
 
                 if sent_count > 0:
+
                     print(
                         "SUBSCRIPTION REMINDER: "
                         f"{sent_count} ta xabar yuborildi."
                     )
 
                 if deactivated_count > 0:
+
                     print(
                         "VPN EXPIRY: "
                         f"{deactivated_count} ta account "
-                        f"deaktivatsiya qilindi."
+                        "deaktivatsiya qilindi."
                     )
 
         except Exception as e:

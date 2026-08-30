@@ -69,6 +69,11 @@ class VPNAccountRepository:
                 ).selectinload(
                     User.subscriptions
                 ),
+                selectinload(
+                    VPNAccount.user
+                ).selectinload(
+                    User.daily_subscriptions
+                ),
             )
             .order_by(
                 VPNAccount.id
@@ -93,6 +98,11 @@ class VPNAccountRepository:
                     VPNAccount.user
                 ).selectinload(
                     User.subscriptions
+                ),
+                selectinload(
+                    VPNAccount.user
+                ).selectinload(
+                    User.daily_subscriptions
                 ),
             )
             .where(
