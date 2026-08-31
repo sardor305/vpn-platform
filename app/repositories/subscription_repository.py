@@ -58,6 +58,25 @@ class SubscriptionRepository:
 
         return list(result.scalars().all())
 
+    async def get_all_active_for_expiry_check(
+        self,
+    ) -> list[Subscription]:
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.user),
+                selectinload(Subscription.plan),
+            )
+            .where(
+                Subscription.status == "active",
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def create(
         self,
         user_id: int,

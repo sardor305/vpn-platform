@@ -30,6 +30,21 @@ class DailySubscriptionRepository:
 
         return result.scalar_one_or_none()
 
+    async def get_all_active_for_expiry_check(
+        self,
+    ) -> list[DailySubscription]:
+
+        stmt = (
+            select(DailySubscription)
+            .where(
+                DailySubscription.status == "active",
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def create(
         self,
         user_id: int,

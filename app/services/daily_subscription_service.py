@@ -13,6 +13,7 @@ from app.utils.datetime import utc_now
 class DailySubscriptionService:
 
     def __init__(self, session: AsyncSession):
+
         self.daily_subscription_repository = (
             DailySubscriptionRepository(session)
         )
@@ -29,6 +30,15 @@ class DailySubscriptionService:
         return await (
             self.daily_subscription_repository
             .get_active_by_user(user_id)
+        )
+
+    async def get_all_active_for_expiry_check(
+        self,
+    ) -> list[DailySubscription]:
+
+        return await (
+            self.daily_subscription_repository
+            .get_all_active_for_expiry_check()
         )
 
     async def calculate_price(

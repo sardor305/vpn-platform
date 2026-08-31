@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,15 @@ class SubscriptionService:
         return await (
             self.subscription_repository
             .get_all_active()
+        )
+
+    async def get_all_active_for_expiry_check(
+        self,
+    ) -> list[Subscription]:
+
+        return await (
+            self.subscription_repository
+            .get_all_active_for_expiry_check()
         )
 
     async def create_subscription(
