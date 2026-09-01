@@ -15,7 +15,6 @@ from app.database.database import async_session
 from app.factories.marzban_factory import create_marzban_service
 from app.keyboards.admin import (
     admin_menu,
-    daily_price_keyboard,
     users_menu,
     vpn_account_actions_keyboard,
     vpn_accounts_keyboard,
@@ -208,6 +207,7 @@ def search_result_keyboard(
         ]
     )
 
+
 def subscription_plans_keyboard(
     user_id: int,
     plans,
@@ -244,6 +244,7 @@ def subscription_plans_keyboard(
     return InlineKeyboardMarkup(
         inline_keyboard=buttons
     )
+
 
 def format_datetime(
     value,
@@ -797,9 +798,10 @@ async def process_user_search(
     )
 
 
-@router.callback_query(
-    F.data.startswith("search_refresh:")
-)
+# ============================================================
+# OBUNANI O‘ZGARTIRISH
+# ============================================================
+
 @router.callback_query(
     F.data.startswith("search_change_plan:")
 )
@@ -865,6 +867,15 @@ async def search_change_plan(
             plans=plans,
         ),
     )
+
+
+# ============================================================
+# QIDIRUV NATIJASINI YANGILASH
+# ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_refresh:")
+)
 async def search_result_refresh(
     callback: CallbackQuery,
 ):
