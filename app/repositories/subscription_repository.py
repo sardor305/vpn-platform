@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -30,6 +28,29 @@ class SubscriptionRepository:
                 Subscription.status == "active",
                 Subscription.end_date > now,
             )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalar_one_or_none()
+
+    async def get_latest_by_user(
+        self,
+        user_id: int,
+    ) -> Subscription | None:
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan)
+            )
+            .where(
+                Subscription.user_id == user_id,
+            )
+            .order_by(
+                Subscription.id.desc()
+            )
+            .limit(1)
         )
 
         result = await self.session.execute(stmt)

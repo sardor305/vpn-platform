@@ -13,6 +13,25 @@ from app.services.vpn_account_service import VPNAccountService
 router = Router()
 
 
+async def get_marzban_status(username: str) -> str | None:
+
+    try:
+        marzban_service = create_marzban_service()
+        data = await marzban_service.get_user(username=username)
+
+        if data is None:
+            return None
+
+        return data.get("status")
+
+    except Exception as e:
+        print(
+            "MY SUBSCRIPTION MARZBAN STATUS ERROR:",
+            repr(e),
+        )
+        return None
+
+
 @router.message(F.text == "👤 Mening obunam")
 async def my_subscription(message: Message):
 
@@ -36,39 +55,64 @@ async def my_subscription(message: Message):
         )
 
         if info is None:
-
             await message.answer(
-                "❌ Sizda faol obuna mavjud emas.\n\n"
+                "❌ Sizda obuna mavjud emas.\n\n"
                 "🛒 \"Obuna sotib olish\" bo‘limidan "
                 "tarif tanlang."
             )
-
             return
 
         subscription = info["subscription"]
         daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
 
-        if (
-            subscription is None
-            and daily_subscription is None
-        ):
+    # ============================================================
+    # ODDIY OBUNA
+    # ============================================================
+
+    if subscription is not None:
+
+        if subscription.status != "active":
+
+            vpn_status = (
+                "🟢 Faol"
+                if vpn_account is not None and vpn_account.is_active
+                else "🔴 Faol emas"
+            )
+
+            marzban_status = None
+
+            if vpn_account is not None:
+                marzban_status = await get_marzban_status(
+                    vpn_account.marzban_username
+                )
+
+            if marzban_status == "active":
+                marzban_text = "🟢 Active"
+            elif marzban_status == "disabled":
+                marzban_text = "🔴 Disabled"
+            elif marzban_status:
+                marzban_text = str(marzban_status)
+            else:
+                marzban_text = "⚠️ Ma'lumot olinmadi"
 
             await message.answer(
-                "❌ Sizda faol obuna mavjud emas.\n\n"
-                "🛒 \"Obuna sotib olish\" bo‘limidan "
-                "tarif tanlang."
+                f"👤 <b>Mening obunam</b>\n\n"
+                f"🔴 <b>Muddati tugagan</b>\n\n"
+                f"📦 Tarif: <b>{subscription.plan.name}</b>\n"
+                f"💰 Narxi: <b>{subscription.plan.price} ₽</b>\n\n"
+                f"📅 Boshlangan sana:\n"
+                f"{subscription.start_date.strftime('%d.%m.%Y')}\n\n"
+                f"⏳ Tugash sanasi:\n"
+                f"{subscription.end_date.strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"🔐 VPN: {vpn_status}\n"
+                f"☁️ Marzban: {marzban_text}",
+                parse_mode="HTML",
             )
 
             return
 
-    if subscription is not None:
-
-        status = (
-            "🟢 Faol"
-            if subscription.status == "active"
-            else "🔴 Faol emas"
-        )
+        status = "🟢 Faol"
 
         if vpn_account is None:
 
@@ -122,12 +166,14 @@ async def my_subscription(message: Message):
 
         return
 
-    # Daily subscription
+    # ============================================================
+    # DAILY SUBSCRIPTION
+    # ============================================================
 
     if daily_subscription is None:
 
         await message.answer(
-            "❌ Sizda faol obuna mavjud emas.\n\n"
+            "❌ Sizda obuna mavjud emas.\n\n"
             "🛒 \"Obuna sotib olish\" bo‘limidan "
             "tarif tanlang."
         )
@@ -234,6 +280,15 @@ async def create_vpn_for_subscription(
         subscription = info["subscription"]
         daily_subscription = info["daily_subscription"]
         vpn_account = info["vpn_account"]
+
+        if subscription is not None and subscription.status != "active":
+            await callback.message.edit_text(
+                "🔴 <b>Obunangiz faol emas.</b>\n\n"
+                "🛒 Yangi obuna sotib oling yoki obunangizni "
+                "faollashtirishni kuting.",
+                parse_mode="HTML",
+            )
+            return
 
         if (
             subscription is None

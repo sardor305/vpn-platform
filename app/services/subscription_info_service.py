@@ -40,10 +40,18 @@ class SubscriptionInfoService:
         daily_subscription = None
 
         if subscription is None:
-
             daily_subscription = (
                 await self.daily_subscription_service
                 .get_active_subscription(user_id)
+            )
+
+        # Active subscription always has priority.
+        if subscription is None and daily_subscription is None:
+            # No active subscription exists. Return the latest normal
+            # subscription so the user can still see its history/status.
+            subscription = (
+                await self.subscription_service
+                .get_latest_subscription(user_id)
             )
 
         vpn_account = (
@@ -52,6 +60,12 @@ class SubscriptionInfoService:
                 protocol="vless",
             )
         )
+
+        if (
+            subscription is None
+            and daily_subscription is None
+        ):
+            return None
 
         return {
             "subscription": subscription,

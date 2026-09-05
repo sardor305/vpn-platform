@@ -26,6 +26,16 @@ class SubscriptionService:
             .get_active_by_user(user_id)
         )
 
+    async def get_latest_subscription(
+        self,
+        user_id: int,
+    ) -> Subscription | None:
+
+        return await (
+            self.subscription_repository
+            .get_latest_by_user(user_id)
+        )
+
     async def get_all_active_subscriptions(
         self,
     ) -> list[Subscription]:

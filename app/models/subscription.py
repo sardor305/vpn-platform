@@ -1,13 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.plan import Plan
+    from app.models.user import User
 
 
 class Subscription(Base):
@@ -15,38 +15,43 @@ class Subscription(Base):
 
     id: Mapped[int] = mapped_column(
         Integer,
-        primary_key=True
+        primary_key=True,
     )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
-        nullable=False
+        nullable=False,
     )
 
     plan_id: Mapped[int] = mapped_column(
         ForeignKey("plans.id"),
-        nullable=False
+        nullable=False,
     )
 
     start_date: Mapped[DateTime] = mapped_column(
         DateTime,
-        nullable=False
+        nullable=False,
     )
 
     end_date: Mapped[DateTime] = mapped_column(
         DateTime,
-        nullable=False
+        nullable=False,
+    )
+
+    previous_end_date: Mapped[DateTime | None] = mapped_column(
+        DateTime,
+        nullable=True,
     )
 
     status: Mapped[str] = mapped_column(
         String(20),
-        nullable=False
+        nullable=False,
     )
 
     user: Mapped["User"] = relationship(
-        back_populates="subscriptions"
+        back_populates="subscriptions",
     )
 
     plan: Mapped["Plan"] = relationship(
-        back_populates="subscriptions"
+        back_populates="subscriptions",
     )
