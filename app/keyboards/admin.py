@@ -195,7 +195,7 @@ def admin_user_search_actions_keyboard(
         ],
         [
             InlineKeyboardButton(
-                text="⏳ Muddatni uzaytirish",
+                text="🛠 Muddatni boshqarish",
                 callback_data=f"admin_user_extend:{user_id}",
             ),
         ],

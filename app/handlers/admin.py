@@ -24,6 +24,7 @@ from app.services.plan_service import PlanService
 from app.services.setting_service import SettingService
 from app.services.statistics_service import StatisticsService
 from app.services.subscription_info_service import SubscriptionInfoService
+from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
 
@@ -194,7 +195,7 @@ def search_result_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    text="⏳ Muddatni uzaytirish",
+                    text="🛠 Muddatni boshqarish",
                     callback_data=f"search_extend:{user_id}",
                 ),
             ],
@@ -799,7 +800,7 @@ async def process_user_search(
 
 
 # ============================================================
-# OBUNANI O‘ZGARTIRISH
+# OBUNANI O‘ZGARTIRISH — TARIFLAR RO‘YXATI
 # ============================================================
 
 @router.callback_query(
@@ -866,6 +867,193 @@ async def search_change_plan(
             user_id=user_id,
             plans=plans,
         ),
+    )
+
+
+# ============================================================
+# OBUNANI O‘ZGARTIRISH — TARIFNI TANLASH
+# ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_plan:")
+)
+async def search_plan(
+    callback: CallbackQuery,
+):
+
+    parts = callback.data.split(":")
+
+    if len(parts) != 3:
+
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+
+        return
+
+    user_id = int(parts[1])
+    plan_id = int(parts[2])
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+        if user is None:
+
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+
+            return
+
+        plan_service = PlanService(session)
+
+        plan = await plan_service.get_plan(
+            plan_id=plan_id
+        )
+
+        if plan is None or not plan.is_active:
+
+            await callback.answer(
+                "Tanlangan tarif mavjud emas yoki faol emas.",
+                show_alert=True,
+            )
+
+            return
+
+        subscription_service = SubscriptionService(
+            session=session
+        )
+
+        subscription = (
+            await subscription_service
+            .get_active_subscription(
+                user_id=user_id
+            )
+        )
+
+        if subscription is None:
+
+            await callback.answer(
+                "Foydalanuvchida faol obuna mavjud emas.",
+                show_alert=True,
+            )
+
+            return
+
+        old_plan = subscription.plan
+
+        await subscription_service.change_plan(
+            subscription=subscription,
+            plan_id=plan.id,
+        )
+
+        await session.commit()
+
+    await callback.answer(
+        "Tarif muvaffaqiyatli o‘zgartirildi. ✅"
+    )
+
+    await callback.message.edit_text(
+        "✅ <b>OBUNA TARIFI O‘ZGARTIRILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"📦 Eski tarif: "
+        f"<b>{escape(old_plan.name)}</b>\n"
+        f"📦 Yangi tarif: "
+        f"<b>{escape(plan.name)}</b>\n\n"
+        "📅 Obuna muddati o‘zgartirilmadi.\n"
+        f"⏳ Tugash sanasi: "
+        f"<b>{format_datetime(subscription.end_date)}</b>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Qidiruv natijasiga qaytish",
+                        callback_data=f"search_back:{user_id}",
+                    )
+                ],
+            ]
+        ),
+    )
+
+
+# ============================================================
+# OBUNANI O‘ZGARTIRISH — BEKOR QILISH
+# ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_plan_cancel:")
+)
+async def search_plan_cancel(
+    callback: CallbackQuery,
+):
+
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+    if user is None:
+
+        await callback.answer(
+            "Foydalanuvchi topilmadi.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer(
+        "Bekor qilindi."
+    )
+
+    await callback.message.edit_text(
+        "🔄 <b>Ma'lumotlar yangilanmoqda...</b>",
+        parse_mode="HTML",
+    )
+
+    await show_user_search_result(
+        message=callback.message,
+        user=user,
     )
 
 
@@ -1121,6 +1309,7 @@ async def search_back(
         message=callback.message,
         user=user,
     )
+
 
 @router.callback_query(
     F.data.startswith("search_refresh:")
