@@ -870,8 +870,149 @@ async def search_change_plan(
 
 
 # ============================================================
-# QIDIRUV NATIJASINI YANGILASH
+# VPN LINK
 # ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_vpn_link:")
+)
+async def search_vpn_link(
+    callback: CallbackQuery,
+):
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+
+        subscription_info_service = SubscriptionInfoService(
+            session=session,
+        )
+
+        info = await subscription_info_service.get_info(
+            user_id=user_id
+        )
+
+    vpn_account = info["vpn_account"]
+
+    if vpn_account is None:
+        await callback.answer(
+            "Foydalanuvchida VPN hisob mavjud emas.",
+            show_alert=True,
+        )
+        return
+
+    vpn_link = None
+
+    marzban_data = await get_marzban_user_data(
+        username=vpn_account.marzban_username,
+    )
+
+    if marzban_data:
+
+        links = marzban_data.get("links")
+
+        if links:
+            vpn_link = links[0]
+
+    if not vpn_link:
+        vpn_link = vpn_account.vpn_link
+
+    if not vpn_link:
+        await callback.answer(
+            "VPN link mavjud emas.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    text = (
+        "📋 <b>VPN LINK</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"🔐 Protocol: "
+        f"<b>{escape(vpn_account.protocol.upper())}</b>\n"
+        f"🔑 Marzban username: "
+        f"<code>{escape(vpn_account.marzban_username)}</code>\n\n"
+        "🔗 <b>VLESS LINK</b>\n"
+        f"<code>{escape(vpn_link)}</code>"
+    )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Qidiruv natijasiga qaytish",
+                    callback_data=f"search_back:{user_id}",
+                )
+            ],
+        ]
+    )
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
+
+@router.callback_query(
+    F.data.startswith("search_back:")
+)
+async def search_back(
+    callback: CallbackQuery,
+):
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+    if user is None:
+        await callback.answer(
+            "Foydalanuvchi topilmadi.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "🔄 <b>Ma'lumotlar yangilanmoqda...</b>",
+        parse_mode="HTML",
+    )
+
+    await show_user_search_result(
+        message=callback.message,
+        user=user,
+    )
 
 @router.callback_query(
     F.data.startswith("search_refresh:")
