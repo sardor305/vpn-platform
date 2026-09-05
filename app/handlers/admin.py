@@ -966,6 +966,114 @@ async def search_vpn_link(
         reply_markup=keyboard,
     )
 
+
+# ============================================================
+# SUBSCRIPTION URL
+# ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_subscription:")
+)
+async def search_subscription(
+    callback: CallbackQuery,
+):
+
+    user_id = int(
+        callback.data.split(":")[1]
+    )
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
+        return
+
+    async with async_session() as session:
+
+        subscription_info_service = SubscriptionInfoService(
+            session=session,
+        )
+
+        info = await subscription_info_service.get_info(
+            user_id=user_id
+        )
+
+    vpn_account = info["vpn_account"]
+
+    if vpn_account is None:
+
+        await callback.answer(
+            "Foydalanuvchida VPN hisob mavjud emas.",
+            show_alert=True,
+        )
+
+        return
+
+    subscription_url = None
+
+    marzban_data = await get_marzban_user_data(
+        username=vpn_account.marzban_username,
+    )
+
+    if marzban_data:
+
+        subscription_url = (
+            marzban_data.get("subscription_url")
+        )
+
+    if not subscription_url:
+
+        subscription_url = (
+            vpn_account.subscription_url
+        )
+
+    if not subscription_url:
+
+        await callback.answer(
+            "Subscription URL mavjud emas.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.answer()
+
+    text = (
+        "🔗 <b>SUBSCRIPTION URL</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"🔐 Protocol: "
+        f"<b>{escape(vpn_account.protocol.upper())}</b>\n"
+        f"🔑 Marzban username: "
+        f"<code>{escape(vpn_account.marzban_username)}</code>\n\n"
+        "🌐 <b>SUBSCRIPTION URL</b>\n"
+        f"<code>{escape(subscription_url)}</code>"
+    )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Qidiruv natijasiga qaytish",
+                    callback_data=f"search_back:{user_id}",
+                )
+            ],
+        ]
+    )
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
+
+
 @router.callback_query(
     F.data.startswith("search_back:")
 )
