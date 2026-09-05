@@ -27,6 +27,7 @@ from app.services.subscription_info_service import SubscriptionInfoService
 from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
+from app.utils.datetime import utc_now
 
 
 router = Router()
@@ -1055,6 +1056,369 @@ async def search_plan_cancel(
         message=callback.message,
         user=user,
     )
+
+
+def subscription_extend_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="➕ 7 kun", callback_data=f"search_extend_days:{user_id}:7"),
+                InlineKeyboardButton(text="➕ 30 kun", callback_data=f"search_extend_days:{user_id}:30"),
+            ],
+            [
+                InlineKeyboardButton(text="➖ 7 kun", callback_data=f"search_extend_days:{user_id}:-7"),
+                InlineKeyboardButton(text="➖ 30 kun", callback_data=f"search_extend_days:{user_id}:-30"),
+            ],
+            [InlineKeyboardButton(text="✏️ Boshqa muddat", callback_data=f"search_extend_custom:{user_id}")],
+            [InlineKeyboardButton(text="❌ Darhol tugatish", callback_data=f"search_extend_zero:{user_id}")],
+            [InlineKeyboardButton(text="↩️ Bekor qilish", callback_data=f"search_extend_cancel:{user_id}")],
+        ]
+    )
+
+
+def subscription_extend_result_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Qidiruv natijasiga qaytish", callback_data=f"search_back:{user_id}")]
+        ]
+    )
+
+
+def subscription_zero_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="⚠️ Ha, tugatish", callback_data=f"search_extend_zero_confirm:{user_id}")],
+            [InlineKeyboardButton(text="↩️ Bekor qilish", callback_data=f"search_extend_cancel:{user_id}")],
+        ]
+    )
+
+
+async def sync_subscription_vpn(session, user_id: int, subscription, vpn_account):
+    marzban_service = create_marzban_service()
+    vpn_service = VPNAccountService(session=session, marzban_service=marzban_service)
+
+    if vpn_account is None:
+        return await vpn_service.get_or_create(
+            user_id=user_id,
+            end_date=subscription.end_date,
+            protocol="vless",
+        )
+
+    await marzban_service.update_user_expire(
+        username=vpn_account.marzban_username,
+        expire=subscription.end_date,
+    )
+
+    if not vpn_account.is_active:
+        await vpn_service.activate_account(account_id=vpn_account.id)
+
+    return vpn_account
+
+
+async def adjust_subscription_and_vpn(session, user_id: int, days: int):
+    subscription_service = SubscriptionService(session)
+    subscription = await subscription_service.get_active_subscription(user_id=user_id)
+
+    if subscription is None:
+        raise ValueError("Foydalanuvchida faol obuna mavjud emas.")
+
+    old_end_date = subscription.end_date
+    subscription = await subscription_service.adjust_subscription_duration(
+        subscription=subscription,
+        days=days,
+    )
+
+    info_service = SubscriptionInfoService(session=session)
+    info = await info_service.get_info(user_id=user_id)
+
+    await sync_subscription_vpn(
+        session=session,
+        user_id=user_id,
+        subscription=subscription,
+        vpn_account=info["vpn_account"],
+    )
+
+    await session.commit()
+    return old_end_date, subscription
+
+
+# ============================================================
+# MUDDATNI BOSHQARISH
+# ============================================================
+
+@router.callback_query(F.data.startswith("search_extend:"))
+async def search_extend(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        subscription = await SubscriptionService(session).get_active_subscription(user_id=user_id)
+
+    if subscription is None:
+        await callback.answer("Foydalanuvchida faol obuna mavjud emas.", show_alert=True)
+        return
+
+    remaining_seconds = max(0, (subscription.end_date - utc_now()).total_seconds())
+    remaining_days = int((remaining_seconds + 86399) // 86400)
+
+    text = (
+        "🛠 <b>MUDDATNI BOSHQARISH</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        f"📦 Tarif: <b>{escape(subscription.plan.name)}</b>\n"
+        f"💰 Narx: <b>{subscription.plan.price} ₽</b>\n\n"
+        f"📅 Boshlangan sana:\n{format_datetime(subscription.start_date)}\n\n"
+        f"⏳ Hozirgi tugash sanasi:\n{format_datetime(subscription.end_date)}\n\n"
+        f"⏱ Qolgan muddat: <b>{remaining_days} kun</b>\n\n"
+        "Muddatni o‘zgartirish uchun amalni tanlang:"
+    )
+
+    await callback.answer()
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=subscription_extend_keyboard(user_id),
+    )
+
+
+@router.callback_query(F.data.startswith("search_extend_days:"))
+async def search_extend_days(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer("Noto‘g‘ri so‘rov.", show_alert=True)
+        return
+
+    try:
+        user_id = int(parts[1])
+        days = int(parts[2])
+    except ValueError:
+        await callback.answer("Noto‘g‘ri so‘rov.", show_alert=True)
+        return
+
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        try:
+            old_end_date, subscription = await adjust_subscription_and_vpn(
+                session=session,
+                user_id=user_id,
+                days=days,
+            )
+        except ValueError as e:
+            await session.rollback()
+            await callback.answer(str(e), show_alert=True)
+            return
+        except Exception as e:
+            await session.rollback()
+            print("SUBSCRIPTION EXTEND ERROR:", repr(e))
+            await callback.answer("Obuna muddatini o‘zgartirishda xatolik yuz berdi.", show_alert=True)
+            return
+
+    action = "qo‘shildi" if days > 0 else "ayirildi"
+    text = (
+        "✅ <b>OBUNA MUDDATI O‘ZGARTIRILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        f"⏳ Eski tugash sanasi:\n{format_datetime(old_end_date)}\n\n"
+        f"{'➕' if days > 0 else '➖'} {abs(days)} kun {action}.\n\n"
+        f"📅 Yangi tugash sanasi:\n<b>{format_datetime(subscription.end_date)}</b>\n\n"
+        "🔐 Marzban expire ham yangilandi."
+    )
+    await callback.answer("Muddat yangilandi. ✅")
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=subscription_extend_result_keyboard(user_id))
+
+
+@router.callback_query(F.data.startswith("search_extend_custom:"))
+async def search_extend_custom(callback: CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    await state.set_state(AdminSearchStates.waiting_for_custom_extend_days)
+    await state.update_data(extend_user_id=user_id)
+    await callback.answer()
+    await callback.message.edit_text(
+        "✏️ <b>MUDDATNI O‘ZGARTIRISH</b>\n\n"
+        "Kun sonini <b>+</b> yoki <b>-</b> belgisi bilan yuboring.\n\n"
+        "➕ Qo‘shish: <code>+15</code>\n"
+        "➖ Ayirish: <code>-15</code>\n\n"
+        "Masalan: <code>+10</code>, <code>-7</code>, <code>+30</code>",
+        parse_mode="HTML",
+    )
+
+
+@router.message(AdminSearchStates.waiting_for_custom_extend_days)
+async def process_custom_extend_days(message: Message, state: FSMContext):
+    admin = await get_admin(telegram_id=message.from_user.id)
+    if admin is None or not admin.is_admin:
+        await state.clear()
+        return
+
+    value = (message.text or "").strip()
+    if not value or value[0] not in "+-" or not value[1:].isdigit() or int(value) == 0:
+        await message.answer(
+            "❌ <b>Noto‘g‘ri format.</b>\n\n"
+            "Kunlarni + yoki - belgisi bilan kiriting.\n"
+            "Masalan: <code>+15</code> yoki <code>-15</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    data = await state.get_data()
+    user_id = data.get("extend_user_id")
+    await state.clear()
+
+    if not user_id:
+        await message.answer("❌ So‘rov ma’lumotlari topilmadi.", parse_mode="HTML")
+        return
+
+    days = int(value)
+    async with async_session() as session:
+        try:
+            old_end_date, subscription = await adjust_subscription_and_vpn(
+                session=session,
+                user_id=user_id,
+                days=days,
+            )
+        except ValueError as e:
+            await session.rollback()
+            await message.answer(f"❌ {escape(str(e))}", parse_mode="HTML")
+            return
+        except Exception as e:
+            await session.rollback()
+            print("CUSTOM SUBSCRIPTION EXTEND ERROR:", repr(e))
+            await message.answer("❌ Obuna muddatini o‘zgartirishda xatolik yuz berdi.", parse_mode="HTML")
+            return
+
+    action = "qo‘shildi" if days > 0 else "ayirildi"
+    await message.answer(
+        "✅ <b>OBUNA MUDDATI O‘ZGARTIRILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        f"⏳ Eski tugash sanasi:\n{format_datetime(old_end_date)}\n\n"
+        f"{'➕' if days > 0 else '➖'} {abs(days)} kun {action}.\n\n"
+        f"📅 Yangi tugash sanasi:\n<b>{format_datetime(subscription.end_date)}</b>\n\n"
+        "🔐 Marzban expire ham yangilandi.",
+        parse_mode="HTML",
+        reply_markup=subscription_extend_result_keyboard(user_id),
+    )
+
+
+@router.callback_query(F.data.startswith("search_extend_zero:"))
+async def search_extend_zero(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        subscription = await SubscriptionService(session).get_active_subscription(user_id=user_id)
+
+    if subscription is None:
+        await callback.answer("Foydalanuvchida faol obuna mavjud emas.", show_alert=True)
+        return
+
+    await callback.answer()
+    await callback.message.edit_text(
+        "⚠️ <b>OBUNANI DARHOL TUGATISH</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        f"📦 Tarif: <b>{escape(subscription.plan.name)}</b>\n"
+        f"💰 Narx: <b>{subscription.plan.price} ₽</b>\n\n"
+        f"⏳ Hozirgi tugash sanasi:\n{format_datetime(subscription.end_date)}\n\n"
+        "❗ Obuna darhol tugatiladi.\n"
+        "❗ VPN hisob deaktivatsiya qilinadi.\n"
+        "❗ Marzban disabled holatiga o‘tadi.\n\n"
+        "Bu amalni davom ettirasizmi?",
+        parse_mode="HTML",
+        reply_markup=subscription_zero_confirmation_keyboard(user_id),
+    )
+
+
+@router.callback_query(F.data.startswith("search_extend_zero_confirm:"))
+async def search_extend_zero_confirm(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        subscription_service = SubscriptionService(session)
+        subscription = await subscription_service.get_active_subscription(user_id=user_id)
+        if subscription is None:
+            await callback.answer("Foydalanuvchida faol obuna mavjud emas.", show_alert=True)
+            return
+
+        now = utc_now()
+        try:
+            subscription.end_date = now
+            subscription.status = "expired"
+
+            info = await SubscriptionInfoService(session=session).get_info(user_id=user_id)
+            vpn_account = info["vpn_account"]
+
+            if vpn_account is not None:
+                marzban_service = create_marzban_service()
+                await marzban_service.update_user_expire(
+                    username=vpn_account.marzban_username,
+                    expire=now,
+                )
+                await marzban_service.deactivate_user(
+                    username=vpn_account.marzban_username,
+                )
+                vpn_account.is_active = False
+
+            await subscription_service.subscription_repository.update(subscription)
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            print("SUBSCRIPTION ZERO ERROR:", repr(e))
+            await callback.answer("Obunani tugatishda xatolik yuz berdi.", show_alert=True)
+            return
+
+    await callback.answer("Obuna tugatildi. 🔴")
+    await callback.message.edit_text(
+        "🔴 <b>OBUNA TUGATILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        "📦 Obuna holati: <b>Muddati tugagan</b>\n"
+        f"⏳ Tugash sanasi:\n<b>{format_datetime(now)}</b>\n\n"
+        "🔐 VPN: <b>Faol emas</b>\n"
+        "☁️ Marzban: <b>Disabled</b>",
+        parse_mode="HTML",
+        reply_markup=subscription_extend_result_keyboard(user_id),
+    )
+
+
+@router.callback_query(F.data.startswith("search_extend_cancel:"))
+async def search_extend_cancel(callback: CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    await state.clear()
+    async with async_session() as session:
+        user = await UserService(session).get_by_id(user_id=user_id)
+
+    if user is None:
+        await callback.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+
+    await callback.answer("Bekor qilindi.")
+    await callback.message.edit_text("🔄 <b>Ma'lumotlar yangilanmoqda...</b>", parse_mode="HTML")
+    await show_user_search_result(message=callback.message, user=user)
 
 
 # ============================================================

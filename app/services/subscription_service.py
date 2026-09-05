@@ -90,3 +90,28 @@ class SubscriptionService:
         return await self.subscription_repository.update(
             subscription
         )
+
+    async def adjust_subscription_duration(
+        self,
+        subscription: Subscription,
+        days: int,
+    ) -> Subscription:
+
+        new_end_date = (
+            subscription.end_date
+            + timedelta(days=days)
+        )
+
+        now = utc_now()
+
+        if new_end_date <= now:
+            raise ValueError(
+                "Obuna muddatini bundan ortiq "
+                "qisqartirish mumkin emas."
+            )
+
+        subscription.end_date = new_end_date
+
+        return await self.subscription_repository.update(
+            subscription
+        )
