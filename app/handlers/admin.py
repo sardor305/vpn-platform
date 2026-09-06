@@ -978,70 +978,64 @@ async def search_plan(
 
         else:
 
+            subscription_info_service = (
+                SubscriptionInfoService(session)
+            )
+
+            info = await subscription_info_service.get_info(
+                user_id=user_id
+            )
+
+            old_subscription = (
+                info["subscription"]
+                if info is not None
+                else None
+            )
+
+            vpn_account = (
+                info["vpn_account"]
+                if info is not None
+                else None
+            )
+
             subscription = (
                 await subscription_service
-                .get_latest_subscription(
-                    user_id=user_id
+                .create_subscription(
+                    user_id=user_id,
+                    plan_id=plan.id,
+                    duration_days=plan.duration_days,
                 )
             )
 
-            if subscription is not None:
+            await sync_vpn_with_subscription(
+                session=session,
+                user_id=user_id,
+                subscription=subscription,
+                vpn_account=vpn_account,
+            )
 
-                old_plan = subscription.plan
+            await session.commit()
 
-                await subscription_service.change_plan(
-                    subscription=subscription,
-                    plan_id=plan.id,
-                )
-
-                await session.commit()
+            if old_subscription is not None:
 
                 result_text = (
-                    "✅ <b>OBUNA TARIFI O‘ZGARTIRILDI</b>\n\n"
+                    "✅ <b>YANGI OBUNA BERILDI</b>\n\n"
                     f"👤 User ID: <code>{user_id}</code>\n"
-                    f"📦 Eski tarif: "
-                    f"<b>{escape(old_plan.name)}</b>\n"
+                    f"📦 Eski obuna: "
+                    f"<b>{escape(old_subscription.plan.name)}</b> "
+                    "🔴 Muddati tugagan\n"
                     f"📦 Yangi tarif: "
-                    f"<b>{escape(plan.name)}</b>\n\n"
-                    "📅 Obuna muddati o‘zgartirilmadi.\n"
+                    f"<b>{escape(plan.name)}</b>\n"
+                    f"💰 Narx: <b>{plan.price} ₽</b>\n\n"
+                    f"📅 Boshlangan sana: "
+                    f"<b>{format_datetime(subscription.start_date)}</b>\n"
                     f"⏳ Tugash sanasi: "
-                    f"<b>{format_datetime(subscription.end_date)}</b>\n"
-                    "🔴 Status: Muddati tugagan"
+                    f"<b>{format_datetime(subscription.end_date)}</b>\n\n"
+                    "🟢 Obuna faollashtirildi.\n"
+                    "🔐 VPN hisob ham sinxronlashtirildi."
                 )
 
             else:
-
-                subscription = (
-                    await subscription_service
-                    .create_subscription(
-                        user_id=user_id,
-                        plan_id=plan.id,
-                        duration_days=plan.duration_days,
-                    )
-                )
-
-                subscription_info_service = (
-                    SubscriptionInfoService(session)
-                )
-
-                info = await subscription_info_service.get_info(
-                    user_id=user_id
-                )
-
-                vpn_account = (
-                    info["vpn_account"]
-                    if info is not None
-                    else None
-                )
-
-                await sync_vpn_with_subscription(
-                    session=session,
-                    user_id=user_id,
-                    subscription=subscription,
-                    vpn_account=vpn_account,
-                )
-
-                await session.commit()
 
                 result_text = (
                     "✅ <b>YANGI OBUNA BERILDI</b>\n\n"
