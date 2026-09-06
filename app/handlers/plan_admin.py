@@ -14,6 +14,12 @@ from app.services.plan_service import PlanService
 from app.services.user_service import UserService
 from app.services.setting_service import SettingService
 from app.states.plan import PlanStates
+from app.utils.admin_navigation import (
+    admin_back_keyboard,
+    delete_last_admin_message,
+    remember_admin_message,
+    replace_with_admin_panel,
+)
 
 
 router = Router()
@@ -47,6 +53,8 @@ async def admin_plans(
     if admin is None:
         return
 
+    await delete_last_admin_message(message)
+
     async with async_session() as session:
 
         plan_service = PlanService(session)
@@ -65,12 +73,12 @@ async def admin_plans(
             f"<b>{daily_price} RUB</b>\n\n"
             "Hozircha tariflar mavjud emas.",
             parse_mode="HTML",
-            reply_markup=admin_menu,
+            reply_markup=admin_back_keyboard("admin_plan_back"),
         )
 
         return
 
-    await message.answer(
+    sent = await message.answer(
         "📦 <b>Tariflar</b>\n\n"
         f"💰 1 kunlik narx: "
         f"<b>{daily_price} RUB</b>\n\n"
@@ -78,6 +86,7 @@ async def admin_plans(
         parse_mode="HTML",
         reply_markup=admin_plans_keyboard(plans),
     )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -853,11 +862,8 @@ async def admin_plan_back(
         )
         return
 
-    await callback.message.answer(
-        "🔐 <b>Admin panel</b>\n\n"
-        "Kerakli bo'limni tanlang:",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=callback.message,
     )
 
     await callback.answer()

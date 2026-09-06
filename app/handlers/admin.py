@@ -29,6 +29,13 @@ from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.vpn_account_service import VPNAccountService
 from app.utils.datetime import utc_now
+from app.utils.admin_navigation import (
+    admin_back_keyboard,
+    delete_last_admin_message,
+    remember_admin_message,
+    replace_with_admin_panel,
+    send_admin_panel,
+)
 
 
 router = Router()
@@ -685,7 +692,7 @@ async def show_user_search_result(
             f"<code>{escape(subscription_url or '—')}</code>"
         )
 
-    await message.answer(
+    return await message.answer(
         text,
         parse_mode="HTML",
         reply_markup=search_result_keyboard(
@@ -696,20 +703,12 @@ async def show_user_search_result(
 
 @router.message(F.text == "admin")
 async def admin_panel(message: Message):
-
     user = await get_admin(
         telegram_id=message.from_user.id
     )
-
     if user is None or not user.is_admin:
         return
-
-    await message.answer(
-        "🔐 <b>Admin panel</b>\n\n"
-        "Kerakli bo'limni tanlang:",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
-    )
+    await send_admin_panel(message)
 
 
 @router.message(F.text == "🔎 Qidiruv")
@@ -725,11 +724,13 @@ async def search_user(
     if user is None or not user.is_admin:
         return
 
+    await delete_last_admin_message(message)
+
     await state.set_state(
         AdminSearchStates.waiting_for_user_id
     )
 
-    await message.answer(
+    sent = await message.answer(
         "🔎 <b>Foydalanuvchi qidirish</b>\n\n"
         "User ID yoki Telegram ID raqamini yuboring.\n\n"
         "Masalan:\n"
@@ -737,7 +738,9 @@ async def search_user(
         "yoki\n"
         "<code>522599954</code>",
         parse_mode="HTML",
+        reply_markup=admin_back_keyboard("search_admin_panel"),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(
@@ -794,6 +797,7 @@ async def process_user_search(
             )
 
     await state.clear()
+    await delete_last_admin_message(message)
 
     if found_user is None:
 
@@ -807,10 +811,11 @@ async def process_user_search(
 
         return
 
-    await show_user_search_result(
+    sent = await show_user_search_result(
         message=message,
         user=found_user,
     )
+    await remember_admin_message(sent)
 
 
 # ============================================================
@@ -2063,6 +2068,29 @@ async def search_subscription(
 
 
 @router.callback_query(
+    F.data == "admin_section_back"
+)
+async def admin_section_back(
+    callback: CallbackQuery,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await replace_with_admin_panel(
+        message=callback.message,
+    )
+
+
+@router.callback_query(
     F.data == "search_admin_panel"
 )
 async def search_admin_panel(
@@ -2081,12 +2109,8 @@ async def search_admin_panel(
 
     await callback.answer()
 
-    await callback.message.delete()
-
-    await callback.message.answer(
-        "👨‍💼 <b>ADMIN PANEL</b>",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=callback.message,
     )
 
 
@@ -2320,6 +2344,8 @@ async def all_subscription_history_message(
     if admin is None or not admin.is_admin:
         return
 
+    await delete_last_admin_message(message)
+
     await show_all_subscription_history(
         message=message,
         page=1,
@@ -2405,12 +2431,8 @@ async def all_subscription_history_back(
 
     await callback.answer()
 
-    await callback.message.delete()
-
-    await callback.message.answer(
-        "👨‍💼 <b>ADMIN PANEL</b>",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=callback.message,
     )
 
 
@@ -2779,6 +2801,8 @@ async def statistics(message: Message):
         if admin is None or not admin.is_admin:
             return
 
+        await delete_last_admin_message(message)
+
         statistics_service = StatisticsService(session)
 
         stats = await statistics_service.get_statistics()
@@ -2825,11 +2849,12 @@ async def statistics(message: Message):
         f"└ Yopilgan: <b>{stats.closed_tickets}</b>"
     )
 
-    await message.answer(
+    sent = await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=admin_menu,
+        reply_markup=admin_back_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(F.text == "👥 Foydalanuvchilar")
@@ -2846,17 +2871,20 @@ async def users_list(message: Message):
         if admin is None or not admin.is_admin:
             return
 
+        await delete_last_admin_message(message)
+
         users = await user_service.get_all_users()
         total = await user_service.count_users()
 
     if not users:
 
-        await message.answer(
+        sent = await message.answer(
             "👥 <b>Foydalanuvchilar</b>\n\n"
             "Hozircha foydalanuvchilar mavjud emas.",
             parse_mode="HTML",
-            reply_markup=users_menu,
+            reply_markup=admin_back_keyboard(),
         )
+        await remember_admin_message(sent)
 
         return
 
@@ -2897,11 +2925,12 @@ async def users_list(message: Message):
             f"Status: {status}\n\n"
         )
 
-    await message.answer(
+    sent = await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=users_menu,
+        reply_markup=admin_back_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(F.text == "🔑 VPN hisoblar")
@@ -2918,6 +2947,8 @@ async def vpn_accounts_list(message: Message):
         if admin is None or not admin.is_admin:
             return
 
+        await delete_last_admin_message(message)
+
         marzban_service = create_marzban_service()
 
         vpn_account_service = VPNAccountService(
@@ -2929,12 +2960,13 @@ async def vpn_accounts_list(message: Message):
 
     if not accounts:
 
-        await message.answer(
+        sent = await message.answer(
             "🔑 <b>VPN HISOBLAR</b>\n\n"
             "Hozircha VPN hisoblar mavjud emas.",
             parse_mode="HTML",
-            reply_markup=admin_menu,
+            reply_markup=admin_back_keyboard(),
         )
+        await remember_admin_message(sent)
 
         return
 
@@ -2944,11 +2976,12 @@ async def vpn_accounts_list(message: Message):
         "Hisobni tanlang:"
     )
 
-    await message.answer(
+    sent = await message.answer(
         text,
         parse_mode="HTML",
         reply_markup=vpn_accounts_keyboard(accounts),
     )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(F.data == "vpn_accounts:back")
@@ -3614,11 +3647,8 @@ async def back_to_admin_panel(message: Message):
     if user is None or not user.is_admin:
         return
 
-    await message.answer(
-        "🔐 <b>Admin panel</b>\n\n"
-        "Kerakli bo'limni tanlang:",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=message,
     )
 
 

@@ -2,7 +2,12 @@ from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from app.database.database import async_session
 from app.keyboards.admin import admin_menu
@@ -23,6 +28,13 @@ from app.services.support_ticket_service import (
 from app.services.user_service import UserService
 from app.states.support import SupportStates
 from app.states.plan import PlanStates
+from app.utils.admin_navigation import (
+    admin_back_keyboard,
+    delete_last_admin_message,
+    remember_admin_message,
+    replace_with_admin_panel,
+    send_admin_panel,
+)
 
 
 router = Router()
@@ -45,6 +57,33 @@ async def get_admin(
     return user
 
 
+def support_tickets_keyboard(tickets) -> InlineKeyboardMarkup:
+    buttons = []
+
+    for ticket in tickets:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f"📩 Murojaat #{ticket.id}",
+                    callback_data=f"ticket_view:{ticket.id}",
+                )
+            ]
+        )
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Admin panel",
+                callback_data="support_admin_panel_back",
+            )
+        ]
+    )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+
 @router.message(F.text == "📩 Murojaatlar")
 async def support_tickets_list(
     message: Message,
@@ -56,51 +95,36 @@ async def support_tickets_list(
     if admin is None:
         return
 
+    await delete_last_admin_message(message)
+
     async with async_session() as session:
-
-        support_service = SupportTicketService(
-            session
-        )
-
+        support_service = SupportTicketService(session)
         tickets = await support_service.get_active_tickets()
 
     if not tickets:
-        await message.answer(
+        sent = await message.answer(
             "📩 <b>Murojaatlar</b>\n\n"
             "Hozircha murojaatlar mavjud emas.",
             parse_mode="HTML",
-            reply_markup=admin_menu,
-        )
-
-        return
-
-    await message.answer(
-        "📩 <b>Murojaatlar</b>\n\n"
-        f"Jami faol murojaatlar: "
-        f"<b>{len(tickets)}</b>\n\n"
-        "Kerakli murojaatni tanlang:",
-        parse_mode="HTML",
-    )
-
-    for ticket in tickets:
-
-        status = {
-            "new": "🟡 Yangi",
-            "open": "🔵 Jarayonda",
-            "closed": "🟢 Yechilgan",
-        }.get(
-            ticket.status,
-            ticket.status,
-        )
-
-        await message.answer(
-            f"📩 <b>Murojaat #{ticket.id}</b>\n\n"
-            f"Status: {status}",
-            parse_mode="HTML",
-            reply_markup=ticket_list_keyboard(
-                ticket.id
+            reply_markup=admin_back_keyboard(
+                "support_admin_panel_back"
             ),
         )
+        await remember_admin_message(sent)
+        return
+
+    text = (
+        "📩 <b>Murojaatlar</b>\n\n"
+        f"Jami faol murojaatlar: <b>{len(tickets)}</b>\n\n"
+        "Kerakli murojaatni tanlang:"
+    )
+
+    sent = await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=support_tickets_keyboard(tickets),
+    )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -210,13 +234,22 @@ async def view_ticket(
                 f"{escape(support_message.message)}\n\n"
             )
 
-    await callback.message.answer(
+    keyboard = ticket_keyboard(ticket.id)
+    keyboard.inline_keyboard.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Admin panel",
+                callback_data="support_admin_panel_back",
+            )
+        ]
+    )
+
+    await callback.message.edit_text(
         text,
         parse_mode="HTML",
-        reply_markup=ticket_keyboard(
-            ticket.id
-        ),
+        reply_markup=keyboard,
     )
+    await remember_admin_message(callback.message)
 
     await callback.answer()
 
@@ -270,6 +303,8 @@ async def start_ticket_reply(
         )
         return
 
+    await delete_last_admin_message(callback.message)
+
     await state.set_state(
         SupportStates.waiting_for_admin_reply
     )
@@ -278,12 +313,16 @@ async def start_ticket_reply(
         ticket_id=ticket_id
     )
 
-    await callback.message.answer(
+    sent = await callback.message.answer(
         f"✍️ <b>Murojaat #{ticket_id}</b> uchun "
         "javobingizni yozing.\n\n"
         "❌ Bekor qilish uchun /cancel yozing.",
         parse_mode="HTML",
+        reply_markup=admin_back_keyboard(
+            "support_admin_panel_back"
+        ),
     )
+    await remember_admin_message(sent)
 
     await callback.answer()
 
@@ -475,10 +514,8 @@ async def close_ticket(
         except Exception:
             pass
 
-    await callback.message.answer(
-        f"✅ Murojaat #{ticket.id} yopildi.",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=callback.message,
     )
 
     await callback.answer()
@@ -545,12 +582,35 @@ async def delete_ticket(
         except Exception:
             pass
 
-    await callback.message.answer(
-        f"🗑 Murojaat #{ticket.id} o‘chirildi.",
-        parse_mode="HTML",
-        reply_markup=admin_menu,
+    await replace_with_admin_panel(
+        message=callback.message,
     )
 
+    await callback.answer()
+
+
+@router.callback_query(
+    F.data == "support_admin_panel_back"
+)
+async def support_admin_panel_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None:
+        await callback.answer(
+            "Ruxsat berilmagan.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await replace_with_admin_panel(
+        message=callback.message,
+    )
     await callback.answer()
 
 
@@ -562,12 +622,10 @@ async def cancel_admin_reply(
     current_state = await state.get_state()
 
     if current_state == SupportStates.waiting_for_admin_reply.state:
+        await delete_last_admin_message(message)
         await state.clear()
 
-        await message.answer(
-            "❌ Murojaatga javob berish bekor qilindi.",
-            reply_markup=admin_menu,
-        )
+        await send_admin_panel(message)
 
         return
 
