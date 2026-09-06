@@ -23,6 +23,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="📩 Murojaatlar"),
         ],
         [
+            KeyboardButton(text="📜 Barcha obunalar tarixi"),
+        ],
+        [
             KeyboardButton(text="⬅️ Asosiy menyu"),
         ],
     ],

@@ -62,6 +62,20 @@ class SubscriptionService:
             )
         )
 
+    async def get_all_subscription_history_paginated(
+        self,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[Subscription], int]:
+
+        return await (
+            self.subscription_repository
+            .get_all_paginated(
+                page=page,
+                page_size=page_size,
+            )
+        )
+
     async def get_all_active_subscriptions(
         self,
     ) -> list[Subscription]:

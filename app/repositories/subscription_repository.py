@@ -132,6 +132,53 @@ class SubscriptionRepository:
 
         return subscriptions, total
 
+    async def get_all_paginated(
+        self,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[Subscription], int]:
+
+        if page < 1:
+            page = 1
+
+        if page_size < 1:
+            page_size = 5
+
+        count_stmt = (
+            select(func.count(Subscription.id))
+        )
+
+        count_result = await self.session.execute(
+            count_stmt
+        )
+
+        total = count_result.scalar_one()
+
+        offset = (
+            (page - 1) * page_size
+        )
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.user),
+                selectinload(Subscription.plan),
+            )
+            .order_by(
+                Subscription.id.desc()
+            )
+            .offset(offset)
+            .limit(page_size)
+        )
+
+        result = await self.session.execute(stmt)
+
+        subscriptions = list(
+            result.scalars().all()
+        )
+
+        return subscriptions, total
+
     async def get_all_active(
         self,
     ) -> list[Subscription]:

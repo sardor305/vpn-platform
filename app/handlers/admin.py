@@ -2163,6 +2163,332 @@ async def search_result_refresh(
 
 
 # ============================================================
+# BARCHA OBUNALAR TARIXI
+# ============================================================
+
+ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE = 5
+
+
+def all_subscription_history_keyboard(
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+
+    buttons = []
+    navigation = []
+
+    if page > 1:
+        navigation.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=(
+                    f"all_subscription_history:{page - 1}"
+                ),
+            )
+        )
+
+    navigation.append(
+        InlineKeyboardButton(
+            text=f"{page} / {total_pages}",
+            callback_data="all_subscription_history_noop",
+        )
+    )
+
+    if page < total_pages:
+        navigation.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=(
+                    f"all_subscription_history:{page + 1}"
+                ),
+            )
+        )
+
+    buttons.append(navigation)
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Admin panel",
+                callback_data="all_subscription_history_back",
+            ),
+        ]
+    )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+
+def format_all_subscription_history_item(
+    index: int,
+    subscription,
+) -> str:
+
+    user = subscription.user
+    plan = subscription.plan
+
+    if subscription.status == "active":
+        status = "🟢 Faol"
+    elif subscription.status == "expired":
+        status = "🔴 Muddati tugagan"
+    else:
+        status = f"⚪ {escape(subscription.status)}"
+
+    full_name = user.first_name
+
+    if user.last_name:
+        full_name += f" {user.last_name}"
+
+    username = (
+        f"@{user.username}"
+        if user.username
+        else "username yo‘q"
+    )
+
+    text = (
+        f"<b>{index}️⃣ {escape(plan.name)}</b>\n"
+        f"👤 User ID: <code>{user.id}</code>\n"
+        f"👨‍💼 Ism: {escape(full_name)}\n"
+        f"🔹 Username: {escape(username)}\n"
+        f"💰 Narx: <b>{plan.price} ₽</b>\n"
+        f"📅 Boshlangan: "
+        f"{format_datetime(subscription.start_date)}\n"
+    )
+
+    if subscription.previous_end_date is not None:
+        text += (
+            f"⏳ Rejalashtirilgan tugash: "
+            f"{format_datetime(subscription.previous_end_date)}\n"
+            f"🛑 Amalda tugatilgan: "
+            f"{format_datetime(subscription.end_date)}\n"
+        )
+    else:
+        text += (
+            f"⏳ Tugash sanasi: "
+            f"{format_datetime(subscription.end_date)}\n"
+        )
+
+    text += f"📌 Status: {status}"
+
+    return text
+
+
+@router.message(F.text == "📜 Barcha obunalar tarixi")
+async def all_subscription_history_message(
+    message: Message,
+):
+
+    admin = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        return
+
+    await show_all_subscription_history(
+        message=message,
+        page=1,
+        edit=False,
+    )
+
+
+@router.callback_query(
+    F.data == "all_subscription_history_noop"
+)
+async def all_subscription_history_noop(
+    callback: CallbackQuery,
+):
+
+    await callback.answer()
+
+
+@router.callback_query(
+    F.data.startswith("all_subscription_history:")
+)
+async def all_subscription_history_page(
+    callback: CallbackQuery,
+):
+
+    parts = callback.data.split(":")
+
+    if len(parts) != 2:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    try:
+        page = int(parts[1])
+    except ValueError:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    if page < 1:
+        page = 1
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await show_all_subscription_history(
+        message=callback.message,
+        page=page,
+        edit=True,
+    )
+
+
+@router.callback_query(
+    F.data == "all_subscription_history_back"
+)
+async def all_subscription_history_back(
+    callback: CallbackQuery,
+):
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await callback.message.delete()
+
+    await callback.message.answer(
+        "👨‍💼 <b>ADMIN PANEL</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+
+
+async def show_all_subscription_history(
+    message: Message,
+    page: int,
+    edit: bool,
+):
+
+    async with async_session() as session:
+
+        subscription_service = SubscriptionService(
+            session=session
+        )
+
+        subscriptions, total = (
+            await subscription_service
+            .get_all_subscription_history_paginated(
+                page=page,
+                page_size=ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE,
+            )
+        )
+
+    if total == 0:
+        text = (
+            "📜 <b>BARCHA OBUNALAR TARIXI</b>\n\n"
+            "Hozircha obunalar mavjud emas."
+        )
+
+        if edit:
+            await message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=all_subscription_history_keyboard(
+                    page=1,
+                    total_pages=1,
+                ),
+            )
+        else:
+            await message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=all_subscription_history_keyboard(
+                    page=1,
+                    total_pages=1,
+                ),
+            )
+
+        return
+
+    total_pages = (
+        total + ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE - 1
+    ) // ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE
+
+    if page > total_pages:
+        page = total_pages
+
+        async with async_session() as session:
+            subscription_service = SubscriptionService(
+                session=session
+            )
+
+            subscriptions, total = (
+                await subscription_service
+                .get_all_subscription_history_paginated(
+                    page=page,
+                    page_size=ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE,
+                )
+            )
+
+    start_number = (
+        (page - 1) * ALL_SUBSCRIPTION_HISTORY_PAGE_SIZE + 1
+    )
+
+    items = []
+
+    for offset, subscription in enumerate(
+        subscriptions
+    ):
+        items.append(
+            format_all_subscription_history_item(
+                index=start_number + offset,
+                subscription=subscription,
+            )
+        )
+
+    text = (
+        "📜 <b>BARCHA OBUNALAR TARIXI</b>\n\n"
+        f"📊 Jami obunalar: <b>{total}</b>\n\n"
+        + "\n\n".join(items)
+    )
+
+    keyboard = all_subscription_history_keyboard(
+        page=page,
+        total_pages=total_pages,
+    )
+
+    if edit:
+        await message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+    else:
+        await message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+
+
+# ============================================================
 # OBUNALAR TARIXI
 # ============================================================
 
