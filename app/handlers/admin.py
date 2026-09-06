@@ -213,6 +213,12 @@ def search_result_keyboard(
                     callback_data=f"search_delete_vpn:{user_id}",
                 ),
             ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Admin panel",
+                    callback_data="search_admin_panel",
+                ),
+            ],
         ]
     )
 
@@ -2053,6 +2059,34 @@ async def search_subscription(
         text,
         parse_mode="HTML",
         reply_markup=keyboard,
+    )
+
+
+@router.callback_query(
+    F.data == "search_admin_panel"
+)
+async def search_admin_panel(
+    callback: CallbackQuery,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await callback.message.delete()
+
+    await callback.message.answer(
+        "👨‍💼 <b>ADMIN PANEL</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
     )
 
 
