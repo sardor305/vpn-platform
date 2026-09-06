@@ -191,7 +191,7 @@ def search_result_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    text="📦 Obunani o‘zgartirish",
+                    text="📦 Obuna / tarifni boshqarish",
                     callback_data=f"search_change_plan:{user_id}",
                 ),
             ],
@@ -953,38 +953,115 @@ async def search_plan(
             )
         )
 
-        if subscription is None:
+        if subscription is not None:
 
-            await callback.answer(
-                "Foydalanuvchida faol obuna mavjud emas.",
-                show_alert=True,
+            old_plan = subscription.plan
+
+            await subscription_service.change_plan(
+                subscription=subscription,
+                plan_id=plan.id,
             )
 
-            return
+            await session.commit()
 
-        old_plan = subscription.plan
+            result_text = (
+                "✅ <b>OBUNA TARIFI O‘ZGARTIRILDI</b>\n\n"
+                f"👤 User ID: <code>{user_id}</code>\n"
+                f"📦 Eski tarif: "
+                f"<b>{escape(old_plan.name)}</b>\n"
+                f"📦 Yangi tarif: "
+                f"<b>{escape(plan.name)}</b>\n\n"
+                "📅 Obuna muddati o‘zgartirilmadi.\n"
+                f"⏳ Tugash sanasi: "
+                f"<b>{format_datetime(subscription.end_date)}</b>"
+            )
 
-        await subscription_service.change_plan(
-            subscription=subscription,
-            plan_id=plan.id,
-        )
+        else:
 
-        await session.commit()
+            subscription = (
+                await subscription_service
+                .get_latest_subscription(
+                    user_id=user_id
+                )
+            )
+
+            if subscription is not None:
+
+                old_plan = subscription.plan
+
+                await subscription_service.change_plan(
+                    subscription=subscription,
+                    plan_id=plan.id,
+                )
+
+                await session.commit()
+
+                result_text = (
+                    "✅ <b>OBUNA TARIFI O‘ZGARTIRILDI</b>\n\n"
+                    f"👤 User ID: <code>{user_id}</code>\n"
+                    f"📦 Eski tarif: "
+                    f"<b>{escape(old_plan.name)}</b>\n"
+                    f"📦 Yangi tarif: "
+                    f"<b>{escape(plan.name)}</b>\n\n"
+                    "📅 Obuna muddati o‘zgartirilmadi.\n"
+                    f"⏳ Tugash sanasi: "
+                    f"<b>{format_datetime(subscription.end_date)}</b>\n"
+                    "🔴 Status: Muddati tugagan"
+                )
+
+            else:
+
+                subscription = (
+                    await subscription_service
+                    .create_subscription(
+                        user_id=user_id,
+                        plan_id=plan.id,
+                        duration_days=plan.duration_days,
+                    )
+                )
+
+                subscription_info_service = (
+                    SubscriptionInfoService(session)
+                )
+
+                info = await subscription_info_service.get_info(
+                    user_id=user_id
+                )
+
+                vpn_account = (
+                    info["vpn_account"]
+                    if info is not None
+                    else None
+                )
+
+                await sync_vpn_with_subscription(
+                    session=session,
+                    user_id=user_id,
+                    subscription=subscription,
+                    vpn_account=vpn_account,
+                )
+
+                await session.commit()
+
+                result_text = (
+                    "✅ <b>YANGI OBUNA BERILDI</b>\n\n"
+                    f"👤 User ID: <code>{user_id}</code>\n"
+                    f"📦 Tarif: <b>{escape(plan.name)}</b>\n"
+                    f"💰 Narx: <b>{plan.price} ₽</b>\n\n"
+                    f"📅 Boshlangan sana: "
+                    f"<b>{format_datetime(subscription.start_date)}</b>\n"
+                    f"⏳ Tugash sanasi: "
+                    f"<b>{format_datetime(subscription.end_date)}</b>\n\n"
+                    "🟢 Obuna faollashtirildi.\n"
+                    "🔐 VPN hisob ham sinxronlashtirildi."
+                )
 
     await callback.answer(
-        "Tarif muvaffaqiyatli o‘zgartirildi. ✅"
+        "Amal muvaffaqiyatli bajarildi. ✅"
     )
 
     await callback.message.edit_text(
-        "✅ <b>OBUNA TARIFI O‘ZGARTIRILDI</b>\n\n"
-        f"👤 User ID: <code>{user_id}</code>\n"
-        f"📦 Eski tarif: "
-        f"<b>{escape(old_plan.name)}</b>\n"
-        f"📦 Yangi tarif: "
-        f"<b>{escape(plan.name)}</b>\n\n"
-        "📅 Obuna muddati o‘zgartirilmadi.\n"
-        f"⏳ Tugash sanasi: "
-        f"<b>{format_datetime(subscription.end_date)}</b>",
+        result_text,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
