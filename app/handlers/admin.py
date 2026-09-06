@@ -197,6 +197,12 @@ def search_result_keyboard(
             ],
             [
                 InlineKeyboardButton(
+                    text="📜 Obunalar tarixi",
+                    callback_data=f"search_subscription_history:{user_id}:1",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="🛠 Muddatni boshqarish",
                     callback_data=f"search_extend:{user_id}",
                 ),
@@ -2152,6 +2158,250 @@ async def search_result_refresh(
     await show_user_search_result(
         message=callback.message,
         user=user,
+    )
+
+
+
+# ============================================================
+# OBUNALAR TARIXI
+# ============================================================
+
+SUBSCRIPTION_HISTORY_PAGE_SIZE = 5
+
+
+def subscription_history_keyboard(
+    user_id: int,
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+
+    buttons = []
+
+    navigation = []
+
+    if page > 1:
+        navigation.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=(
+                    f"search_subscription_history:"
+                    f"{user_id}:{page - 1}"
+                ),
+            )
+        )
+
+    navigation.append(
+        InlineKeyboardButton(
+            text=f"{page} / {total_pages}",
+            callback_data="search_subscription_history_noop",
+        )
+    )
+
+    if page < total_pages:
+        navigation.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=(
+                    f"search_subscription_history:"
+                    f"{user_id}:{page + 1}"
+                ),
+            )
+        )
+
+    buttons.append(navigation)
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Qidiruv natijasiga qaytish",
+                callback_data=f"search_back:{user_id}",
+            ),
+        ]
+    )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+
+def format_subscription_history_item(
+    index: int,
+    subscription,
+) -> str:
+
+    plan = subscription.plan
+
+    if subscription.status == "active":
+        status = "🟢 Faol"
+    elif subscription.status == "expired":
+        status = "🔴 Muddati tugagan"
+    else:
+        status = f"⚪ {escape(subscription.status)}"
+
+    text = (
+        f"<b>{index}️⃣ {escape(plan.name)}</b>\n"
+        f"💰 Narx: <b>{plan.price} ₽</b>\n"
+        f"📅 Boshlangan: "
+        f"{format_datetime(subscription.start_date)}\n"
+    )
+
+    if subscription.previous_end_date is not None:
+        text += (
+            f"⏳ Rejalashtirilgan tugash: "
+            f"{format_datetime(subscription.previous_end_date)}\n"
+            f"🛑 Amalda tugatilgan: "
+            f"{format_datetime(subscription.end_date)}\n"
+        )
+    else:
+        text += (
+            f"⏳ Tugash sanasi: "
+            f"{format_datetime(subscription.end_date)}\n"
+        )
+
+    text += f"📌 Status: {status}"
+
+    return text
+
+
+@router.callback_query(
+    F.data == "search_subscription_history_noop"
+)
+async def search_subscription_history_noop(
+    callback: CallbackQuery,
+):
+
+    await callback.answer()
+
+
+@router.callback_query(
+    F.data.startswith("search_subscription_history:")
+)
+async def search_subscription_history(
+    callback: CallbackQuery,
+):
+
+    parts = callback.data.split(":")
+
+    if len(parts) != 3:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    try:
+        user_id = int(parts[1])
+        page = int(parts[2])
+    except ValueError:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    if page < 1:
+        page = 1
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+
+        user_service = UserService(session)
+
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        subscription_service = SubscriptionService(
+            session=session
+        )
+
+        subscriptions, total = (
+            await subscription_service
+            .get_subscription_history_paginated(
+                user_id=user_id,
+                page=page,
+                page_size=SUBSCRIPTION_HISTORY_PAGE_SIZE,
+            )
+        )
+
+    if total == 0:
+        await callback.answer(
+            "Foydalanuvchida obunalar tarixi mavjud emas.",
+            show_alert=True,
+        )
+        return
+
+    total_pages = (
+        total + SUBSCRIPTION_HISTORY_PAGE_SIZE - 1
+    ) // SUBSCRIPTION_HISTORY_PAGE_SIZE
+
+    if page > total_pages:
+        page = total_pages
+
+        async with async_session() as session:
+            subscription_service = SubscriptionService(
+                session=session
+            )
+
+            subscriptions, total = (
+                await subscription_service
+                .get_subscription_history_paginated(
+                    user_id=user_id,
+                    page=page,
+                    page_size=SUBSCRIPTION_HISTORY_PAGE_SIZE,
+                )
+            )
+
+    start_number = (
+        (page - 1) * SUBSCRIPTION_HISTORY_PAGE_SIZE + 1
+    )
+
+    items = []
+
+    for offset, subscription in enumerate(
+        subscriptions
+    ):
+        items.append(
+            format_subscription_history_item(
+                index=start_number + offset,
+                subscription=subscription,
+            )
+        )
+
+    text = (
+        "📜 <b>OBUNALAR TARIXI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"📊 Jami obunalar: <b>{total}</b>\n\n"
+        + "\n\n".join(items)
+    )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=subscription_history_keyboard(
+            user_id=user_id,
+            page=page,
+            total_pages=total_pages,
+        ),
     )
 
 

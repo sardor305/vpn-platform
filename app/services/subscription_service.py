@@ -36,6 +36,32 @@ class SubscriptionService:
             .get_latest_by_user(user_id)
         )
 
+    async def get_subscription_history(
+        self,
+        user_id: int,
+    ) -> list[Subscription]:
+
+        return await (
+            self.subscription_repository
+            .get_all_by_user(user_id)
+        )
+
+    async def get_subscription_history_paginated(
+        self,
+        user_id: int,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[Subscription], int]:
+
+        return await (
+            self.subscription_repository
+            .get_all_by_user_paginated(
+                user_id=user_id,
+                page=page,
+                page_size=page_size,
+            )
+        )
+
     async def get_all_active_subscriptions(
         self,
     ) -> list[Subscription]:
