@@ -230,6 +230,31 @@ def search_result_keyboard(
     )
 
 
+def search_vpn_delete_confirmation_keyboard(
+    user_id: int,
+    account_id: int,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Ha, o‘chirish",
+                    callback_data=(
+                        f"search_delete_vpn_confirm:"
+                        f"{user_id}:{account_id}"
+                    ),
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data=(
+                        f"search_delete_vpn_cancel:{user_id}"
+                    ),
+                ),
+            ],
+        ]
+    )
+
+
 def subscription_plans_keyboard(
     user_id: int,
     plans,
@@ -1963,6 +1988,310 @@ async def search_vpn_link(
 # ============================================================
 # SUBSCRIPTION URL
 # ============================================================
+
+# ============================================================
+# QIDIRUV — VPN HISOBNI O‘CHIRISH
+# ============================================================
+
+@router.callback_query(
+    F.data.startswith("search_delete_vpn:")
+)
+async def search_delete_vpn(
+    callback: CallbackQuery,
+):
+    parts = callback.data.split(":")
+
+    if len(parts) != 2:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        marzban_service = create_marzban_service()
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        vpn_account = await vpn_account_service.get_existing(
+            user_id=user_id,
+            protocol="vless",
+        )
+
+    if vpn_account is None:
+        await callback.answer(
+            "Foydalanuvchida VPN hisob mavjud emas.",
+            show_alert=True,
+        )
+        return
+
+    full_name = escape(user.first_name)
+
+    if user.last_name:
+        full_name += f" {escape(user.last_name)}"
+
+    text = (
+        "⚠️ <b>VPN HISOBNI O‘CHIRISH</b>\n\n"
+        f"👤 Foydalanuvchi: <b>{full_name}</b>\n"
+        f"🆔 User ID: <code>{user.id}</code>\n"
+        f"🔑 Account ID: <code>{vpn_account.id}</code>\n"
+        f"🔐 Marzban username: "
+        f"<code>{escape(vpn_account.marzban_username)}</code>\n"
+        f"📡 Protocol: "
+        f"<b>{escape(vpn_account.protocol.upper())}</b>\n\n"
+        "❗ <b>DIQQAT!</b>\n\n"
+        "Bu amal VPN hisobni butunlay o‘chiradi.\n\n"
+        "• Marzban VPN account o‘chiriladi\n"
+        "• VPNAccount bazadagi yozuvi o‘chiriladi\n"
+        "• Foydalanuvchi saqlanadi\n"
+        "• Obuna saqlanadi\n"
+        "• Obunalar tarixi saqlanadi\n\n"
+        "Davom etishni xohlaysizmi?"
+    )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=search_vpn_delete_confirmation_keyboard(
+            user_id=user_id,
+            account_id=vpn_account.id,
+        ),
+    )
+
+
+@router.callback_query(
+    F.data.startswith("search_delete_vpn_cancel:")
+)
+async def search_delete_vpn_cancel(
+    callback: CallbackQuery,
+):
+    parts = callback.data.split(":")
+
+    if len(parts) != 2:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+    if user is None:
+        await callback.answer(
+            "Foydalanuvchi topilmadi.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer(
+        "O‘chirish bekor qilindi."
+    )
+
+    await callback.message.edit_text(
+        "🔄 <b>Ma'lumotlar yangilanmoqda...</b>",
+        parse_mode="HTML",
+    )
+
+    await show_user_search_result(
+        message=callback.message,
+        user=user,
+    )
+
+
+@router.callback_query(
+    F.data.startswith("search_delete_vpn_confirm:")
+)
+async def search_delete_vpn_confirm(
+    callback: CallbackQuery,
+):
+    parts = callback.data.split(":")
+
+    if len(parts) != 3:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    try:
+        user_id = int(parts[1])
+        account_id = int(parts[2])
+    except ValueError:
+        await callback.answer(
+            "Noto‘g‘ri so‘rov.",
+            show_alert=True,
+        )
+        return
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(
+            user_id=user_id
+        )
+
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        marzban_service = create_marzban_service()
+        vpn_account_service = VPNAccountService(
+            session=session,
+            marzban_service=marzban_service,
+        )
+
+        vpn_account = await vpn_account_service.get_existing(
+            user_id=user_id,
+            protocol="vless",
+        )
+
+        if vpn_account is None:
+            await callback.answer(
+                "VPN hisob allaqachon o‘chirilgan.",
+                show_alert=True,
+            )
+            return
+
+        if vpn_account.id != account_id:
+            await callback.answer(
+                "VPN hisob ma'lumotlari o‘zgargan. Qidiruv natijasini yangilang.",
+                show_alert=True,
+            )
+            return
+
+        try:
+            deleted_account = await vpn_account_service.delete_account(
+                account_id=account_id
+            )
+
+            await session.commit()
+
+        except ValueError as e:
+            await session.rollback()
+            await callback.answer(
+                str(e),
+                show_alert=True,
+            )
+            return
+
+        except Exception as e:
+            await session.rollback()
+            print(
+                "SEARCH VPN DELETE ERROR:",
+                repr(e),
+            )
+            await callback.answer(
+                "VPN hisobni o‘chirishda xatolik yuz berdi.",
+                show_alert=True,
+            )
+            return
+
+    await callback.answer(
+        "VPN hisob o‘chirildi. 🗑"
+    )
+
+    await callback.message.edit_text(
+        "✅ <b>VPN HISOB O‘CHIRILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"🔑 Account ID: <code>{deleted_account.id}</code>\n"
+        f"🔐 Marzban username: "
+        f"<code>{escape(deleted_account.marzban_username)}</code>\n\n"
+        "• Marzban VPN account o‘chirildi\n"
+        "• VPNAccount bazadagi yozuvi o‘chirildi\n"
+        "• Foydalanuvchi saqlanib qoldi\n"
+        "• Obuna va obunalar tarixi saqlanib qoldi.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🔄 Qidiruv natijasini ko‘rish",
+                        callback_data=f"search_back:{user_id}",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Admin panel",
+                        callback_data="search_admin_panel",
+                    )
+                ],
+            ]
+        ),
+    )
+
 
 @router.callback_query(
     F.data.startswith("search_subscription:")
