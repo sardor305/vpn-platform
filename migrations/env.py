@@ -7,7 +7,14 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 from app.database.base import Base
-from app.models import User, Plan, Subscription, VPNAccount
+from app.models import (
+    User,
+    Plan,
+    Subscription,
+    VPNAccount,
+    UserBonus,
+    BonusTraffic,
+)
 
 load_dotenv()
 

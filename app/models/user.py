@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.subscription import Subscription
     from app.models.vpn_account import VPNAccount
     from app.models.daily_subscription import DailySubscription
+    from app.models.user_bonus import UserBonus
 
 
 class User(Base):
@@ -72,5 +73,9 @@ class User(Base):
     daily_subscriptions: Mapped[
         list["DailySubscription"]
     ] = relationship(
+        back_populates="user",
+    )
+
+    bonuses: Mapped[list["UserBonus"]] = relationship(
         back_populates="user",
     )
