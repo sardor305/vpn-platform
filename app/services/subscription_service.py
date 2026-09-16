@@ -11,7 +11,10 @@ from app.utils.datetime import utc_now
 
 class SubscriptionService:
 
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ):
         self.subscription_repository = (
             SubscriptionRepository(session)
         )
@@ -34,6 +37,25 @@ class SubscriptionService:
         return await (
             self.subscription_repository
             .get_latest_by_user(user_id)
+        )
+
+    async def get_pending_subscriptions(
+        self,
+        user_id: int,
+    ) -> list[Subscription]:
+
+        return await (
+            self.subscription_repository
+            .get_pending_by_user(user_id)
+        )
+
+    async def get_all_pending_subscriptions(
+        self,
+    ) -> list[Subscription]:
+
+        return await (
+            self.subscription_repository
+            .get_all_pending()
         )
 
     async def get_subscription_history(
@@ -101,17 +123,60 @@ class SubscriptionService:
         duration_days: int,
     ) -> Subscription:
 
-        start_date = utc_now()
-
-        end_date = start_date + timedelta(
-            days=duration_days
-        )
+        if duration_days <= 0:
+            raise ValueError(
+                "Subscription duration must be greater than zero."
+            )
 
         return await self.subscription_repository.create(
             user_id=user_id,
             plan_id=plan_id,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=None,
+            end_date=None,
+            status="pending",
+        )
+
+    async def activate_subscription(
+        self,
+        subscription: Subscription,
+        start_date=None,
+    ) -> Subscription:
+
+        if subscription.status != "pending":
+            raise ValueError(
+                "Only pending subscriptions can be activated."
+            )
+
+        if subscription.start_date is not None:
+            raise ValueError(
+                "Subscription already has a start date."
+            )
+
+        if subscription.end_date is not None:
+            raise ValueError(
+                "Subscription already has an end date."
+            )
+
+        start = start_date or utc_now()
+
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=utc_now().tzinfo)
+
+        if subscription.plan is None:
+            raise ValueError(
+                "Subscription plan is required to activate it."
+            )
+
+        end = start + timedelta(
+            days=subscription.plan.duration_days
+        )
+
+        subscription.start_date = start
+        subscription.end_date = end
+        subscription.status = "active"
+
+        return await self.subscription_repository.update(
+            subscription
         )
 
     async def change_plan(
@@ -119,6 +184,11 @@ class SubscriptionService:
         subscription: Subscription,
         plan_id: int,
     ) -> Subscription:
+
+        if subscription.status != "active":
+            raise ValueError(
+                "Only active subscriptions can change plan."
+            )
 
         subscription.plan_id = plan_id
 
@@ -131,6 +201,21 @@ class SubscriptionService:
         subscription: Subscription,
         duration_days: int,
     ) -> Subscription:
+
+        if duration_days <= 0:
+            raise ValueError(
+                "Extension duration must be greater than zero."
+            )
+
+        if subscription.status != "active":
+            raise ValueError(
+                "Only active subscriptions can be extended."
+            )
+
+        if subscription.end_date is None:
+            raise ValueError(
+                "Active subscription must have an end date."
+            )
 
         subscription.end_date = (
             subscription.end_date
@@ -146,6 +231,16 @@ class SubscriptionService:
         subscription: Subscription,
         days: int,
     ) -> Subscription:
+
+        if subscription.status != "active":
+            raise ValueError(
+                "Only active subscriptions can be adjusted."
+            )
+
+        if subscription.end_date is None:
+            raise ValueError(
+                "Active subscription must have an end date."
+            )
 
         new_end_date = (
             subscription.end_date

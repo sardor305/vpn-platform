@@ -49,18 +49,69 @@ async def select_tariff(callback: CallbackQuery):
 
         return
 
+    if (
+        result.subscription is not None
+        and result.subscription.end_date is not None
+    ):
+        end_date_text = (
+            result.subscription.end_date.strftime(
+                "%d.%m.%Y"
+            )
+        )
+    else:
+        end_date_text = "Navbatdagi xizmat davrida"
+
+    if result.vpn_link:
+        vpn_text = (
+            "🔗 <b>VLESS havola:</b>\n"
+            f"<code>{result.vpn_link}</code>\n\n"
+        )
+    else:
+        vpn_text = (
+            "🔗 <b>VLESS havola:</b>\n"
+            "VPN hisob faol xizmat davri boshlanganda "
+            "sinxronlanadi.\n\n"
+        )
+
+    if result.subscription_url:
+        subscription_text = (
+            "🔄 <b>Subscription:</b>\n"
+            f"<code>{result.subscription_url}</code>"
+        )
+    else:
+        subscription_text = (
+            "🔄 <b>Subscription:</b>\n"
+            "Faol xizmat davri boshlanganda mavjud bo‘ladi."
+        )
+
+    if (
+        result.subscription is not None
+        and result.subscription.status == "pending"
+    ):
+        title = "✅ <b>Tarif muvaffaqiyatli xarid qilindi!</b>"
+        period_text = (
+            "⏳ <b>Holat:</b> Navbatda\n"
+            "Tarifingiz hozirgi faol xizmat tugagach "
+            "avtomatik ishga tushadi.\n"
+            f"📅 <b>Taxminiy tugash sanasi:</b> "
+            f"{end_date_text}\n\n"
+        )
+    else:
+        title = "🎉 <b>VPN muvaffaqiyatli yaratildi!</b>"
+        period_text = (
+            f"📅 <b>Amal qilish muddati:</b> "
+            f"{end_date_text}\n\n"
+        )
+
     text = (
-        "🎉 <b>VPN muvaffaqiyatli yaratildi!</b>\n\n"
+        f"{title}\n\n"
         f"📦 <b>Tarif:</b> "
         f"{result.plan.name}\n"
         f"💰 <b>Narxi:</b> "
         f"{result.plan.price} ₽\n"
-        f"📅 <b>Amal qilish muddati:</b> "
-        f"{result.subscription.end_date.strftime('%d.%m.%Y')}\n\n"
-        "🔗 <b>VLESS havola:</b>\n"
-        f"<code>{result.vpn_link}</code>\n\n"
-        "🔄 <b>Subscription:</b>\n"
-        f"<code>{result.subscription_url}</code>"
+        f"{period_text}"
+        f"{vpn_text}"
+        f"{subscription_text}"
     )
 
     await callback.message.edit_text(

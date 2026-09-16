@@ -22,6 +22,7 @@ from app.keyboards.admin import (
 )
 from app.keyboards.menu import main_menu
 from app.services.plan_service import PlanService
+from app.services.user_bonus_service import UserBonusService
 from app.services.setting_service import SettingService
 from app.services.statistics_service import StatisticsService
 from app.services.subscription_info_service import SubscriptionInfoService
@@ -46,6 +47,8 @@ class AdminSearchStates(StatesGroup):
     waiting_for_custom_plan_days = State()
     waiting_for_custom_extend_days = State()
     waiting_for_daily_price = State()
+    waiting_for_admin_bonus_days = State()
+    waiting_for_admin_bonus_reason = State()
 
 
 @router.callback_query(
@@ -1173,6 +1176,268 @@ async def search_plan_cancel(
 
 
 
+
+
+# ============================================================
+# ADMIN BONUS — BERISH
+# ============================================================
+
+
+def admin_bonus_duration_keyboard(
+    user_id: int,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="➕ 1 kun",
+                    callback_data=f"admin_bonus_days:{user_id}:1",
+                ),
+                InlineKeyboardButton(
+                    text="➕ 3 kun",
+                    callback_data=f"admin_bonus_days:{user_id}:3",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="➕ 7 kun",
+                    callback_data=f"admin_bonus_days:{user_id}:7",
+                ),
+                InlineKeyboardButton(
+                    text="➕ 30 kun",
+                    callback_data=f"admin_bonus_days:{user_id}:30",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✏️ Boshqa muddat",
+                    callback_data=f"admin_bonus_custom:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="↩️ Bekor qilish",
+                    callback_data=f"search_back:{user_id}",
+                ),
+            ],
+        ]
+    )
+
+
+def admin_bonus_result_keyboard(
+    user_id: int,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Qidiruv natijasiga qaytish",
+                    callback_data=f"search_back:{user_id}",
+                ),
+            ],
+        ]
+    )
+
+
+async def _ask_admin_bonus_reason(
+    callback_or_message,
+    state: FSMContext,
+    user_id: int,
+    days: int,
+):
+    await state.update_data(
+        admin_bonus_user_id=user_id,
+        admin_bonus_days=days,
+    )
+    await state.set_state(
+        AdminSearchStates.waiting_for_admin_bonus_reason
+    )
+    text = (
+        "📝 <b>ADMIN BONUS SABABI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"🎁 Muddat: <b>{days} kun</b>\n\n"
+        "Bonus berish sababini yozing.\n"
+        "Bu maydon majburiy."
+    )
+    if isinstance(callback_or_message, CallbackQuery):
+        await callback_or_message.answer()
+        await callback_or_message.message.edit_text(
+            text,
+            parse_mode="HTML",
+        )
+    else:
+        await callback_or_message.answer(
+            text,
+            parse_mode="HTML",
+        )
+
+
+@router.callback_query(
+    F.data.startswith("admin_user_bonus:")
+)
+async def admin_user_bonus(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(user_id=user_id)
+    if user is None:
+        await callback.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text(
+        "🎁 <b>ADMIN BONUS BERISH</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        "Bonus muddatini tanlang:",
+        parse_mode="HTML",
+        reply_markup=admin_bonus_duration_keyboard(user_id),
+    )
+
+
+@router.callback_query(
+    F.data.startswith("admin_bonus_days:")
+)
+async def admin_bonus_days(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer("Noto‘g‘ri so‘rov.", show_alert=True)
+        return
+    user_id = int(parts[1])
+    days = int(parts[2])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+    await _ask_admin_bonus_reason(callback, state, user_id, days)
+
+
+@router.callback_query(
+    F.data.startswith("admin_bonus_custom:")
+)
+async def admin_bonus_custom(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    user_id = int(callback.data.split(":")[1])
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+    await state.update_data(admin_bonus_user_id=user_id)
+    await state.set_state(AdminSearchStates.waiting_for_admin_bonus_days)
+    await callback.answer()
+    await callback.message.edit_text(
+        "✏️ <b>ADMIN BONUS MUDDATI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        "Necha kun berishni kiriting.\n"
+        "Faqat musbat butun son.\n\n"
+        "Masalan: <code>14</code>, <code>60</code>",
+        parse_mode="HTML",
+    )
+
+
+@router.message(
+    AdminSearchStates.waiting_for_admin_bonus_days
+)
+async def process_admin_bonus_days(
+    message: Message,
+    state: FSMContext,
+):
+    admin = await get_admin(telegram_id=message.from_user.id)
+    if admin is None or not admin.is_admin:
+        await state.clear()
+        return
+    value = (message.text or "").strip()
+    if not value.isdigit() or int(value) <= 0:
+        await message.answer(
+            "❌ Muddat 0 dan katta bo‘lgan butun son bo‘lishi kerak.\n\n"
+            "Masalan: <code>14</code>",
+            parse_mode="HTML",
+        )
+        return
+    data = await state.get_data()
+    user_id = data.get("admin_bonus_user_id")
+    if user_id is None:
+        await state.clear()
+        await message.answer("❌ Admin Bonus sessiyasi topilmadi.", reply_markup=admin_menu)
+        return
+    await _ask_admin_bonus_reason(message, state, user_id, int(value))
+
+
+@router.message(
+    AdminSearchStates.waiting_for_admin_bonus_reason
+)
+async def process_admin_bonus_reason(
+    message: Message,
+    state: FSMContext,
+):
+    admin = await get_admin(telegram_id=message.from_user.id)
+    if admin is None or not admin.is_admin:
+        await state.clear()
+        return
+    reason = (message.text or "").strip()
+    if not reason:
+        await message.answer("❌ Sabab bo‘sh bo‘lishi mumkin emas.")
+        return
+    data = await state.get_data()
+    user_id = data.get("admin_bonus_user_id")
+    days = data.get("admin_bonus_days")
+    if user_id is None or days is None:
+        await state.clear()
+        await message.answer("❌ Admin Bonus sessiyasi topilmadi.", reply_markup=admin_menu)
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(user_id=user_id)
+        if user is None:
+            await state.clear()
+            await message.answer("❌ Foydalanuvchi topilmadi.", reply_markup=admin_menu)
+            return
+        try:
+            bonus_service = UserBonusService(session)
+            bonus = await bonus_service.create_bonus(
+                user_id=user_id,
+                bonus_type="admin",
+                duration_days=int(days),
+                reason=reason,
+            )
+            await session.commit()
+        except ValueError as e:
+            await session.rollback()
+            await message.answer(f"❌ {escape(str(e))}", parse_mode="HTML")
+            return
+        except Exception as e:
+            await session.rollback()
+            print("ADMIN BONUS CREATE ERROR:", repr(e))
+            await message.answer("❌ Admin Bonus berishda xatolik yuz berdi.")
+            return
+
+    await state.clear()
+    number = bonus.bonus_number
+    await message.answer(
+        "✅ <b>ADMIN BONUS BERILDI</b>\n\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"🎁 Admin Bonus <b>#{number}</b>\n"
+        f"⏳ Muddat: <b>{days} kun</b>\n"
+        f"📝 Sabab: <b>{escape(reason)}</b>\n"
+        "📋 Holat: <b>Kutilmoqda</b>\n\n"
+        "Bonus navbatga qo‘shildi va mavjud aktiv xizmatni to‘xtatmaydi.",
+        parse_mode="HTML",
+        reply_markup=admin_bonus_result_keyboard(user_id),
+    )
 
 def subscription_extend_keyboard(
     user_id: int,

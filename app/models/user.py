@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from app.models.vpn_account import VPNAccount
     from app.models.daily_subscription import DailySubscription
     from app.models.user_bonus import UserBonus
+    from app.models.referral import Referral
 
 
 class User(Base):
@@ -78,4 +79,15 @@ class User(Base):
 
     bonuses: Mapped[list["UserBonus"]] = relationship(
         back_populates="user",
+    )
+
+    referrals_sent: Mapped[list["Referral"]] = relationship(
+        foreign_keys="Referral.inviter_user_id",
+        back_populates="inviter",
+    )
+
+    referral_received: Mapped["Referral | None"] = relationship(
+        foreign_keys="Referral.invited_user_id",
+        back_populates="invited_user",
+        uselist=False,
     )

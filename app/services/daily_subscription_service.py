@@ -32,6 +32,25 @@ class DailySubscriptionService:
             .get_active_by_user(user_id)
         )
 
+    async def get_pending_subscriptions(
+        self,
+        user_id: int,
+    ) -> list[DailySubscription]:
+
+        return await (
+            self.daily_subscription_repository
+            .get_pending_by_user(user_id)
+        )
+
+    async def get_all_pending_subscriptions(
+        self,
+    ) -> list[DailySubscription]:
+
+        return await (
+            self.daily_subscription_repository
+            .get_all_pending()
+        )
+
     async def get_all_active_for_expiry_check(
         self,
     ) -> list[DailySubscription]:
@@ -56,11 +75,10 @@ class DailySubscriptionService:
         duration_days: int,
     ) -> DailySubscription:
 
-        start_date = utc_now()
-
-        end_date = start_date + timedelta(
-            days=duration_days
-        )
+        if duration_days <= 0:
+            raise ValueError(
+                "Daily subscription duration must be greater than zero."
+            )
 
         price = await self.calculate_price(
             duration_days
@@ -71,7 +89,33 @@ class DailySubscriptionService:
                 user_id=user_id,
                 duration_days=duration_days,
                 price=price,
-                start_date=start_date,
-                end_date=end_date,
+                start_date=None,
+                end_date=None,
+                status="pending",
+            )
+        )
+
+    async def activate_subscription(
+        self,
+        daily_subscription: DailySubscription,
+        start_date: datetime | None = None,
+    ) -> DailySubscription:
+
+        if daily_subscription.status != "pending":
+            raise ValueError(
+                "Only pending daily subscriptions can be activated."
+            )
+
+        start = start_date or utc_now()
+
+        daily_subscription.start_date = start
+        daily_subscription.end_date = start + timedelta(
+            days=daily_subscription.duration_days
+        )
+        daily_subscription.status = "active"
+
+        return await (
+            self.daily_subscription_repository.update(
+                daily_subscription
             )
         )

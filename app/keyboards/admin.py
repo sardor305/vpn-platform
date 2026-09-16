@@ -17,6 +17,7 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔑 VPN hisoblar"),
         ],
         [
+            KeyboardButton(text="🎟 Promo"),
             KeyboardButton(text="🔎 Qidiruv"),
         ],
         [
@@ -200,6 +201,12 @@ def admin_user_search_actions_keyboard(
             InlineKeyboardButton(
                 text="🛠 Muddatni boshqarish",
                 callback_data=f"admin_user_extend:{user_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="🎁 Admin Bonus berish",
+                callback_data=f"admin_user_bonus:{user_id}",
             ),
         ],
     ]

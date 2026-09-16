@@ -14,7 +14,11 @@ from app.models import (
     VPNAccount,
     UserBonus,
     BonusTraffic,
+    Referral,
+    Promo,
+    PromoRedemption,
 )
+
 
 load_dotenv()
 
@@ -35,8 +39,10 @@ config.set_main_option(
     database_url,
 )
 
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
 
 target_metadata = Base.metadata
 
@@ -68,7 +74,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

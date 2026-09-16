@@ -9,3 +9,6 @@ from .daily_subscription import DailySubscription
 from .subscription_reminder import SubscriptionReminder
 from .user_bonus import UserBonus
 from .bonus_traffic import BonusTraffic
+from .referral import Referral
+from .promo import Promo
+from .promo_redemption import PromoRedemption

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -8,7 +10,10 @@ from app.utils.datetime import utc_now
 
 class SubscriptionRepository:
 
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ):
         self.session = session
 
     async def get_active_by_user(
@@ -26,13 +31,94 @@ class SubscriptionRepository:
             .where(
                 Subscription.user_id == user_id,
                 Subscription.status == "active",
+                Subscription.start_date <= now,
                 Subscription.end_date > now,
             )
+            .order_by(
+                Subscription.start_date.asc(),
+                Subscription.id.asc(),
+            )
+            .limit(1)
         )
 
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def get_expired_active_by_user(
+        self,
+        user_id: int,
+        now: datetime,
+    ) -> list[Subscription]:
+        """Return this user's active subscriptions whose service has ended."""
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan)
+            )
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+                Subscription.end_date.is_not(None),
+                Subscription.end_date <= now,
+            )
+            .order_by(
+                Subscription.end_date.asc(),
+                Subscription.id.asc(),
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
+    async def get_pending_by_user(
+        self,
+        user_id: int,
+    ) -> list[Subscription]:
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan)
+            )
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "pending",
+            )
+            .order_by(
+                Subscription.created_at.asc(),
+                Subscription.id.asc(),
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
+    async def get_all_pending(
+        self,
+    ) -> list[Subscription]:
+
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan),
+                selectinload(Subscription.user),
+            )
+            .where(
+                Subscription.status == "pending",
+            )
+            .order_by(
+                Subscription.created_at.asc(),
+                Subscription.id.asc(),
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
 
     async def get_latest_by_user(
         self,
@@ -48,7 +134,7 @@ class SubscriptionRepository:
                 Subscription.user_id == user_id,
             )
             .order_by(
-                Subscription.id.desc()
+                Subscription.id.desc(),
             )
             .limit(1)
         )
@@ -71,7 +157,7 @@ class SubscriptionRepository:
                 Subscription.user_id == user_id,
             )
             .order_by(
-                Subscription.id.desc()
+                Subscription.id.desc(),
             )
         )
 
@@ -105,9 +191,7 @@ class SubscriptionRepository:
 
         total = count_result.scalar_one()
 
-        offset = (
-            (page - 1) * page_size
-        )
+        offset = (page - 1) * page_size
 
         stmt = (
             select(Subscription)
@@ -118,7 +202,7 @@ class SubscriptionRepository:
                 Subscription.user_id == user_id,
             )
             .order_by(
-                Subscription.id.desc()
+                Subscription.id.desc(),
             )
             .offset(offset)
             .limit(page_size)
@@ -144,8 +228,8 @@ class SubscriptionRepository:
         if page_size < 1:
             page_size = 5
 
-        count_stmt = (
-            select(func.count(Subscription.id))
+        count_stmt = select(
+            func.count(Subscription.id)
         )
 
         count_result = await self.session.execute(
@@ -154,18 +238,16 @@ class SubscriptionRepository:
 
         total = count_result.scalar_one()
 
-        offset = (
-            (page - 1) * page_size
-        )
+        offset = (page - 1) * page_size
 
         stmt = (
             select(Subscription)
             .options(
-                selectinload(Subscription.user),
                 selectinload(Subscription.plan),
+                selectinload(Subscription.user),
             )
             .order_by(
-                Subscription.id.desc()
+                Subscription.id.desc(),
             )
             .offset(offset)
             .limit(page_size)
@@ -188,12 +270,17 @@ class SubscriptionRepository:
         stmt = (
             select(Subscription)
             .options(
-                selectinload(Subscription.user),
                 selectinload(Subscription.plan),
+                selectinload(Subscription.user),
             )
             .where(
                 Subscription.status == "active",
+                Subscription.start_date <= now,
                 Subscription.end_date > now,
+            )
+            .order_by(
+                Subscription.start_date.asc(),
+                Subscription.id.asc(),
             )
         )
 
@@ -224,9 +311,9 @@ class SubscriptionRepository:
         self,
         user_id: int,
         plan_id: int,
-        start_date,
-        end_date,
-        status: str = "active",
+        start_date=None,
+        end_date=None,
+        status: str = "pending",
     ) -> Subscription:
 
         subscription = Subscription(
@@ -241,7 +328,9 @@ class SubscriptionRepository:
 
         await self.session.flush()
 
-        await self.session.refresh(subscription)
+        await self.session.refresh(
+            subscription
+        )
 
         return subscription
 
@@ -252,6 +341,8 @@ class SubscriptionRepository:
 
         await self.session.flush()
 
-        await self.session.refresh(subscription)
+        await self.session.refresh(
+            subscription
+        )
 
         return subscription

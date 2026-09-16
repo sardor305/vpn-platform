@@ -21,7 +21,6 @@ class MarzbanClient:
         username: str,
         password: str,
     ):
-
         response = await self.client.post(
             "/api/admin/token",
             data={
@@ -42,7 +41,6 @@ class MarzbanClient:
         self,
         username: str,
     ):
-
         if self.token is None:
             raise RuntimeError(
                 "MarzbanClient is not authenticated. Call login() first."
@@ -66,7 +64,6 @@ class MarzbanClient:
         self,
         user_data: dict,
     ):
-
         if self.token is None:
             raise RuntimeError(
                 "MarzbanClient is not authenticated. Call login() first."
@@ -89,7 +86,6 @@ class MarzbanClient:
         username: str,
         user_data: dict,
     ):
-
         if self.token is None:
             raise RuntimeError(
                 "MarzbanClient is not authenticated. Call login() first."
@@ -107,11 +103,30 @@ class MarzbanClient:
 
         return response.json()
 
+    async def reset_user_data_usage(
+        self,
+        username: str,
+    ):
+        if self.token is None:
+            raise RuntimeError(
+                "MarzbanClient is not authenticated. Call login() first."
+            )
+
+        response = await self.client.post(
+            f"/api/user/{username}/reset",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+            },
+        )
+
+        response.raise_for_status()
+
+        return response.json()
+
     async def delete_user(
         self,
         username: str,
     ):
-
         if self.token is None:
             raise RuntimeError(
                 "MarzbanClient is not authenticated. Call login() first."

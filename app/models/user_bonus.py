@@ -1,18 +1,27 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
+
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.bonus_traffic import BonusTraffic
+    from app.models.referral import Referral
 
 
 class UserBonus(Base):
     __tablename__ = "user_bonuses"
+
+    __table_args__ = (
+        CheckConstraint(
+            "bonus_type IN ('promo', 'referral', 'admin', 'welcome')",
+            name="ck_user_bonuses_bonus_type",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -29,6 +38,19 @@ class UserBonus(Base):
         String(20),
         nullable=False,
         index=True,
+    )
+
+    # Permanent sequence number within one user and one bonus type.
+    # Promo, referral and admin bonuses use independent sequences.
+    # Welcome is a special one-time bonus and does not need a public number.
+    bonus_number: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    reason: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
     )
 
     duration_days: Mapped[int] = mapped_column(
@@ -53,12 +75,6 @@ class UserBonus(Base):
         nullable=True,
     )
 
-    valid_until: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-        index=True,
-    )
-
     activated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
@@ -67,6 +83,15 @@ class UserBonus(Base):
     user: Mapped["User"] = relationship(
         back_populates="bonuses",
     )
+
+    referral_id: Mapped[int | None] = mapped_column(
+        ForeignKey("referrals.id"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    referral: Mapped["Referral | None"] = relationship()
 
     traffic: Mapped["BonusTraffic | None"] = relationship(
         back_populates="bonus",

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
@@ -28,17 +29,17 @@ class Subscription(Base):
         nullable=False,
     )
 
-    start_date: Mapped[DateTime] = mapped_column(
+    start_date: Mapped[datetime | None] = mapped_column(
         DateTime,
-        nullable=False,
+        nullable=True,
     )
 
-    end_date: Mapped[DateTime] = mapped_column(
+    end_date: Mapped[datetime | None] = mapped_column(
         DateTime,
-        nullable=False,
+        nullable=True,
     )
 
-    previous_end_date: Mapped[DateTime | None] = mapped_column(
+    previous_end_date: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
     )

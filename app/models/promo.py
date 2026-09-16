@@ -1,25 +1,26 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.models.promo_redemption import PromoRedemption
 
 
-class DailySubscription(Base):
-    __tablename__ = "daily_subscriptions"
+class Promo(Base):
+    __tablename__ = "promos"
 
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
     )
 
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+    code: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
         nullable=False,
         index=True,
     )
@@ -29,9 +30,15 @@ class DailySubscription(Base):
         nullable=False,
     )
 
-    price: Mapped[int] = mapped_column(
+    total_redemption_limit: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    per_user_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+        default=1,
     )
 
     start_date: Mapped[datetime | None] = mapped_column(
@@ -44,11 +51,13 @@ class DailySubscription(Base):
         nullable=True,
     )
 
-    status: Mapped[str] = mapped_column(
-        String(20),
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
         nullable=False,
+        default=True,
+        index=True,
     )
 
-    user: Mapped["User"] = relationship(
-        back_populates="daily_subscriptions",
+    redemptions: Mapped[list["PromoRedemption"]] = relationship(
+        back_populates="promo",
     )

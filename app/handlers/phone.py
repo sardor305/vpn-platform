@@ -2,8 +2,7 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from app.database.database import async_session
-from app.keyboards.menu import main_menu
-from app.keyboards.phone import phone_keyboard
+from app.keyboards.menu import landing_menu
 from app.services.user_service import UserService
 
 
@@ -51,8 +50,9 @@ async def receive_phone_number(message: Message):
 
     await message.answer(
         "✅ Telefon raqamingiz muvaffaqiyatli saqlandi!\n\n"
-        "🏠 Endi botdan foydalanishingiz mumkin.",
-        reply_markup=main_menu,
+        "🎁 Endi siz uchun maxsus bonus mavjud.\n\n"
+        "Quyidagi menyudan foydalanishingiz mumkin.",
+        reply_markup=landing_menu,
     )
 
 
@@ -62,6 +62,7 @@ async def skip_phone_number(message: Message):
     await message.answer(
         "👍 Mayli, telefon raqamingizni hozircha "
         "ulashmadingiz.\n\n"
-        "🏠 Botdan foydalanishingiz mumkin.",
-        reply_markup=main_menu,
+        "🎁 Siz baribir maxsus bonusdan foydalanishingiz mumkin.\n\n"
+        "Quyidagi menyudan foydalanishingiz mumkin.",
+        reply_markup=landing_menu,
     )

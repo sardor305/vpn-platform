@@ -10,6 +10,9 @@ from app.services.marzban_service import MarzbanService
 
 class VPNAccountService:
 
+    DATA_LIMIT_UNLIMITED = 0
+    DATA_LIMIT_RESET_NO_RESET = "no_reset"
+
     def __init__(
         self,
         session: AsyncSession,
@@ -24,6 +27,8 @@ class VPNAccountService:
         user_id: int,
         end_date: datetime,
         protocol: str = "vless",
+        data_limit: int = DATA_LIMIT_UNLIMITED,
+        data_limit_reset_strategy: str = DATA_LIMIT_RESET_NO_RESET,
     ) -> VPNAccount:
 
         vpn_account = await self.repository.get_by_user_and_protocol(
@@ -33,9 +38,11 @@ class VPNAccountService:
 
         if vpn_account is not None:
 
-            await self.marzban_service.update_user_expire(
+            await self.marzban_service.update_user_settings(
                 username=vpn_account.marzban_username,
                 expire=end_date,
+                data_limit=data_limit,
+                data_limit_reset_strategy=data_limit_reset_strategy,
             )
 
             if not vpn_account.is_active:
@@ -59,6 +66,8 @@ class VPNAccountService:
             marzban_user = await self.marzban_service.create_vless_user(
                 username=username,
                 expire=end_date,
+                data_limit=data_limit,
+                data_limit_reset_strategy=data_limit_reset_strategy,
             )
 
         else:

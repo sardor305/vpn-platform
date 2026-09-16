@@ -6,8 +6,9 @@ from app.config.config import config
 
 engine = create_async_engine(
     config.DATABASE_URL,
-    echo=True,
+    echo=False,
 )
+
 
 async_session = async_sessionmaker(
     engine,
@@ -17,7 +18,6 @@ async_session = async_sessionmaker(
 
 async def check_db_connection():
     async with engine.begin() as conn:
-
         result = await conn.execute(
             text("SELECT current_database(), current_user")
         )

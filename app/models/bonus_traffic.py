@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, ForeignKey, Integer
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -33,6 +33,18 @@ class BonusTraffic(Base):
         BigInteger,
         nullable=False,
         default=0,
+    )
+
+    warning_500mb_sent: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    exhausted_notified: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
 
     bonus: Mapped["UserBonus"] = relationship(

@@ -7,6 +7,8 @@ from app.schemas.marzban_user import MarzbanUser
 
 
 class MarzbanService:
+    DATA_LIMIT_UNLIMITED = 0
+    DATA_LIMIT_RESET_NO_RESET = "no_reset"
 
     def __init__(
         self,
@@ -19,7 +21,6 @@ class MarzbanService:
         self.password = password
 
     async def login(self):
-
         return await self.client.login(
             username=self.username,
             password=self.password,
@@ -29,7 +30,6 @@ class MarzbanService:
     def _datetime_to_timestamp(
         value: datetime,
     ) -> int:
-
         if value.tzinfo is None:
             value = value.replace(
                 tzinfo=timezone.utc
@@ -41,24 +41,18 @@ class MarzbanService:
         self,
         user_data: dict,
     ) -> MarzbanUser:
-
         await self.login()
 
         username = user_data["username"]
 
         try:
-
             result = await self.client.create_user(
                 user_data=user_data,
             )
 
-            print(
-                "\n========== CREATE USER RESPONSE =========="
-            )
+            print("\n========== CREATE USER RESPONSE ==========")
             print(result)
-
         except HTTPStatusError as e:
-
             if e.response.status_code != 409:
                 raise
 
@@ -71,33 +65,21 @@ class MarzbanService:
                     "Marzban foydalanuvchini qaytara olmadi."
                 )
 
-            print(
-                "\n========== GET USER RESPONSE =========="
-            )
+            print("\n========== GET USER RESPONSE ==========")
             print(result)
 
+        print("\n========== DEBUG ==========")
+        print("USERNAME:", result.get("username"))
+        print("LINKS:", result.get("links"))
+        print("SUBSCRIPTION:", result.get("subscription_url"))
+        print("EXPIRE:", result.get("expire"))
+        print("DATA LIMIT:", result.get("data_limit"))
         print(
-            "\n========== DEBUG =========="
+            "DATA LIMIT RESET:",
+            result.get("data_limit_reset_strategy"),
         )
-        print(
-            "USERNAME:",
-            result.get("username"),
-        )
-        print(
-            "LINKS:",
-            result.get("links"),
-        )
-        print(
-            "SUBSCRIPTION:",
-            result.get("subscription_url"),
-        )
-        print(
-            "EXPIRE:",
-            result.get("expire"),
-        )
-        print(
-            "========================================\n"
-        )
+        print("USED TRAFFIC:", result.get("used_traffic"))
+        print("========================================\n")
 
         return MarzbanUser(
             username=result["username"],
@@ -115,27 +97,30 @@ class MarzbanService:
         self,
         username: str,
         expire: datetime,
+        data_limit: int = DATA_LIMIT_UNLIMITED,
+        data_limit_reset_strategy: str = DATA_LIMIT_RESET_NO_RESET,
         inbound_name: str = "VLESS TCP",
     ) -> MarzbanUser:
-
-        expire_timestamp = (
-            self._datetime_to_timestamp(
-                expire
-            )
+        expire_timestamp = self._datetime_to_timestamp(
+            expire
         )
 
         user_data = {
             "username": username,
             "proxies": {
-                "vless": {}
+                "vless": {},
             },
             "inbounds": {
                 "vless": [
-                    inbound_name
-                ]
+                    inbound_name,
+                ],
             },
             "status": "active",
             "expire": expire_timestamp,
+            "data_limit": data_limit,
+            "data_limit_reset_strategy": (
+                data_limit_reset_strategy
+            ),
         }
 
         return await self.create_user(
@@ -146,7 +131,6 @@ class MarzbanService:
         self,
         username: str,
     ) -> dict | None:
-
         await self.login()
 
         return await self.client.get_user(
@@ -158,13 +142,10 @@ class MarzbanService:
         username: str,
         expire: datetime,
     ):
-
         await self.login()
 
-        expire_timestamp = (
-            self._datetime_to_timestamp(
-                expire
-            )
+        expire_timestamp = self._datetime_to_timestamp(
+            expire
         )
 
         return await self.client.modify_user(
@@ -174,11 +155,44 @@ class MarzbanService:
             },
         )
 
+    async def update_user_settings(
+        self,
+        username: str,
+        expire: datetime,
+        data_limit: int = DATA_LIMIT_UNLIMITED,
+        data_limit_reset_strategy: str = DATA_LIMIT_RESET_NO_RESET,
+    ):
+        await self.login()
+
+        expire_timestamp = self._datetime_to_timestamp(
+            expire
+        )
+
+        return await self.client.modify_user(
+            username=username,
+            user_data={
+                "expire": expire_timestamp,
+                "data_limit": data_limit,
+                "data_limit_reset_strategy": (
+                    data_limit_reset_strategy
+                ),
+            },
+        )
+
+    async def reset_user_data_usage(
+        self,
+        username: str,
+    ):
+        await self.login()
+
+        return await self.client.reset_user_data_usage(
+            username=username,
+        )
+
     async def activate_user(
         self,
         username: str,
     ):
-
         await self.login()
 
         return await self.client.modify_user(
@@ -192,7 +206,6 @@ class MarzbanService:
         self,
         username: str,
     ):
-
         await self.login()
 
         return await self.client.modify_user(
@@ -206,7 +219,6 @@ class MarzbanService:
         self,
         username: str,
     ) -> bool:
-
         await self.login()
 
         return await self.client.delete_user(
