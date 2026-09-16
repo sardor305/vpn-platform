@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,31 +31,6 @@ class DailySubscriptionRepository:
 
         return result.scalar_one_or_none()
 
-    async def get_expired_active_by_user(
-        self,
-        user_id: int,
-        now: datetime,
-    ) -> list[DailySubscription]:
-        """Return this user's active Daily services whose period has ended."""
-
-        stmt = (
-            select(DailySubscription)
-            .where(
-                DailySubscription.user_id == user_id,
-                DailySubscription.status == "active",
-                DailySubscription.end_date.is_not(None),
-                DailySubscription.end_date <= now,
-            )
-            .order_by(
-                DailySubscription.end_date.asc(),
-                DailySubscription.id.asc(),
-            )
-        )
-
-        result = await self.session.execute(stmt)
-
-        return list(result.scalars().all())
-
     async def get_pending_by_user(
         self,
         user_id: int,
@@ -70,7 +43,6 @@ class DailySubscriptionRepository:
                 DailySubscription.status == "pending",
             )
             .order_by(
-                DailySubscription.created_at.asc(),
                 DailySubscription.id.asc(),
             )
         )
@@ -89,8 +61,25 @@ class DailySubscriptionRepository:
                 DailySubscription.status == "pending",
             )
             .order_by(
-                DailySubscription.created_at.asc(),
                 DailySubscription.id.asc(),
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return list(result.scalars().all())
+
+    async def get_all_active(
+        self,
+    ) -> list[DailySubscription]:
+        """Return all currently active Daily subscriptions."""
+        now = utc_now()
+        stmt = (
+            select(DailySubscription)
+            .where(
+                DailySubscription.status == "active",
+                DailySubscription.start_date <= now,
+                DailySubscription.end_date > now,
             )
         )
 
