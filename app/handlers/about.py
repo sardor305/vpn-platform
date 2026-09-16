@@ -15,5 +15,6 @@ async def about_handler(message: Message):
         "🤝 Bot orqali VPN xizmatlarini sotib olish, "
         "xizmat muddatini boshqarish va mavjud imkoniyatlardan "
         "foydalanish mumkin.\n\n"
-        "🎁 Yangi foydalanuvchilar uchun maxsus bonus ham mavjud."
+        "🎁 Yangi foydalanuvchilar uchun maxsus bonus ham mavjud.",
+        parse_mode="HTML",
     )

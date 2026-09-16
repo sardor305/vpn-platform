@@ -2,7 +2,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
-from app.keyboards.menu import landing_menu, main_menu
+from app.keyboards.menu import main_menu, main_menu_with_welcome
 from app.keyboards.welcome_bonus import (
     welcome_bonus_confirm_keyboard,
 )
@@ -14,7 +14,6 @@ router = Router()
 
 
 def _bonus_status_text(status: str) -> str:
-
     if status == "active":
         return "🟢 Faol"
 
@@ -34,9 +33,7 @@ def _bonus_status_text(status: str) -> str:
 async def welcome_bonus_handler(
     message: Message,
 ):
-
     async with async_session() as session:
-
         user_service = UserService(
             session
         )
@@ -62,7 +59,6 @@ async def welcome_bonus_handler(
         )
 
     if existing is not None:
-
         await message.answer(
             "🎁 <b>Welcome Bonus</b>\n\n"
             "Siz bu bonusni avval olgansiz.\n\n"
@@ -93,7 +89,6 @@ async def welcome_bonus_handler(
 async def welcome_bonus_cancel(
     callback: CallbackQuery,
 ):
-
     await callback.answer(
         "Bonus olish bekor qilindi."
     )
@@ -105,6 +100,11 @@ async def welcome_bonus_cancel(
         parse_mode="HTML",
     )
 
+    await callback.message.answer(
+        "🏠 Asosiy menyu",
+        reply_markup=main_menu_with_welcome,
+    )
+
 
 @router.callback_query(
     F.data == "welcome_bonus:claim"
@@ -112,9 +112,7 @@ async def welcome_bonus_cancel(
 async def welcome_bonus_claim(
     callback: CallbackQuery,
 ):
-
     async with async_session() as session:
-
         user_service = UserService(
             session
         )
@@ -180,4 +178,9 @@ async def welcome_bonus_claim(
         "ℹ️ Bonusning aniq holati va navbatini "
         "👤 <b>Mening obunam</b> bo‘limidan ko‘rishingiz mumkin.",
         parse_mode="HTML",
+    )
+
+    await callback.message.answer(
+        "🏠 Asosiy menyu",
+        reply_markup=main_menu,
     )

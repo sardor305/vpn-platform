@@ -24,5 +24,6 @@ async def guide_handler(message: Message):
         "Savol yoki muammo yuzaga kelsa, yordam bo‘limidan "
         "foydalaning.\n\n"
         "ℹ️ Qo‘llanmadagi ma’lumotlar platformadagi yangi "
-        "funksiyalar qo‘shilishi bilan kengaytiriladi."
+        "funksiyalar qo‘shilishi bilan kengaytiriladi.",
+        parse_mode="HTML",
     )

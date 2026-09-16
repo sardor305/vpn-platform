@@ -3,10 +3,11 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 
 from app.database.database import async_session
-from app.keyboards.menu import main_menu
+from app.keyboards.menu import main_menu, main_menu_with_welcome
 from app.keyboards.phone import phone_keyboard
 from app.services.referral_service import ReferralService
 from app.services.user_service import UserService
+from app.services.welcome_bonus_service import WelcomeBonusService
 
 
 router = Router()
@@ -78,26 +79,38 @@ async def start_handler(
             await session.rollback()
             raise
 
-    if created:
-        await message.answer(
-            "🎉 Siz muvaffaqiyatli ro'yxatdan o'tdingiz!\n\n"
-            "👋 Assalomu alaykum!\n\n"
-            "VPN Platformaga xush kelibsiz.\n\n"
-            "📱 <b>Telefon raqamingiz</b>\n\n"
-            "Telefon raqamingiz sizni botdagi akkauntingiz "
-            "bilan bog‘lash va xizmatdan foydalanishingizni "
-            "qulay boshqarish uchun kerak.\n\n"
-            "🔒 Raqamingiz boshqa foydalanuvchilarga "
-            "ko‘rsatilmaydi.\n\n"
-            "Telefon raqamingizni ulashishni xohlamasangiz, "
-            "bu bosqichni o'tkazib yuborishingiz mumkin.",
-            parse_mode="HTML",
-            reply_markup=phone_keyboard,
-        )
-        return
+        if created:
+            await message.answer(
+                "🎉 Siz muvaffaqiyatli ro'yxatdan o'tdingiz!\n\n"
+                "👋 Assalomu alaykum!\n\n"
+                "VPN Platformaga xush kelibsiz.\n\n"
+                "📱 <b>Telefon raqamingiz</b>\n\n"
+                "Telefon raqamingiz sizni botdagi akkauntingiz "
+                "bilan bog‘lash va xizmatdan foydalanishingizni "
+                "qulay boshqarish uchun kerak.\n\n"
+                "🔒 Raqamingiz boshqa foydalanuvchilarga "
+                "ko‘rsatilmaydi.\n\n"
+                "Telefon raqamingizni ulashishni xohlamasangiz, "
+                "bu bosqichni o'tkazib yuborishingiz mumkin.",
+                parse_mode="HTML",
+                reply_markup=phone_keyboard,
+            )
+            return
 
-    await message.answer(
-        "👋 Qaytganingizdan xursandmiz!\n\n"
-        "🏠 Asosiy menyu",
-        reply_markup=main_menu,
-    )
+        welcome_bonus_service = WelcomeBonusService(session)
+        existing_welcome = (
+            await welcome_bonus_service.get_existing_welcome(
+                user_id=user.id
+            )
+        )
+
+        if existing_welcome is None:
+            reply_markup = main_menu_with_welcome
+        else:
+            reply_markup = main_menu
+
+        await message.answer(
+            "👋 Qaytganingizdan xursandmiz!\n\n"
+            "🏠 Asosiy menyu",
+            reply_markup=reply_markup,
+        )
