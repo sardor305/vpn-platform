@@ -74,6 +74,7 @@ class ServicePeriodService:
         self,
         session: AsyncSession,
     ):
+        self.session = session
         self.subscription_repository = SubscriptionRepository(session)
         self.user_bonus_repository = UserBonusRepository(session)
         self.daily_subscription_repository = (
