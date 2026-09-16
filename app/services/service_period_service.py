@@ -411,6 +411,18 @@ class ServicePeriodService:
         return queue[-1].end_date
 
     @staticmethod
+    def _normalize_datetime(
+        value: datetime,
+    ) -> datetime:
+        """Normalize a datetime to the project's UTC-aware datetime model."""
+        if value.tzinfo is None:
+            return value.replace(
+                tzinfo=utc_now().tzinfo
+            )
+
+        return value
+
+    @staticmethod
     def _select_next_period(
         candidates: list[ServicePeriod],
         cursor: datetime,
