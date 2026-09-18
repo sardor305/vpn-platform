@@ -5,6 +5,9 @@ import re
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -21,7 +24,14 @@ from app.keyboards.admin import (
     vpn_accounts_keyboard,
 )
 from app.keyboards.menu import main_menu
+from app.models.promo import Promo
+from app.models.promo_redemption import PromoRedemption
+from app.models.user_bonus import UserBonus
 from app.services.plan_service import PlanService
+from app.services.bonus_statistics_service import (
+    BonusStatisticsService,
+    BonusTypeStats,
+)
 from app.services.user_bonus_service import UserBonusService
 from app.services.setting_service import SettingService
 from app.services.statistics_service import StatisticsService
@@ -145,6 +155,25 @@ async def process_daily_price(
     )
 
 
+async def _replace_callback_with_admin_panel(
+    callback: CallbackQuery,
+) -> Message:
+    """Delete the current inline screen and open a fresh admin panel."""
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    sent = await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="👨‍💼 <b>ADMIN PANEL</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu,
+    )
+    await remember_admin_message(sent)
+    return sent
+
+
 async def get_admin(
     telegram_id: int,
 ):
@@ -209,6 +238,12 @@ def search_result_keyboard(
                 InlineKeyboardButton(
                     text="📜 Obunalar tarixi",
                     callback_data=f"search_subscription_history:{user_id}:1",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎁 Bonus statistikasi",
+                    callback_data=f"search_bonus_stats:{user_id}",
                 ),
             ],
             [
@@ -844,6 +879,258 @@ async def process_user_search(
         user=found_user,
     )
     await remember_admin_message(sent)
+
+
+
+@router.callback_query(F.data.startswith("search_bonus_stats:"))
+async def search_bonus_statistics(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id,
+    )
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(user_id=user_id)
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        service = BonusStatisticsService(session)
+        stats = await service.get_user_statistics(user_id=user_id)
+
+    welcome = stats.by_type.get("welcome", BonusTypeStats())
+    promo = stats.by_type.get("promo", BonusTypeStats())
+    referral = stats.by_type.get("referral", BonusTypeStats())
+    admin_bonus = stats.by_type.get("admin", BonusTypeStats())
+    traffic = stats.welcome_traffic
+    ref = stats.referral
+    promo_stats = stats.promo
+
+    full_name = escape(user.first_name)
+    if user.last_name:
+        full_name += f" {escape(user.last_name)}"
+
+    text = (
+        "👤 <b>USER BONUS STATISTIKASI</b>\n\n"
+        f"├ User ID: <code>{user.id}</code>\n"
+        f"├ Ism: {full_name}\n"
+        f"└ Telegram ID: <code>{user.telegram_id}</code>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🎁 <b>BONUSLAR</b>\n"
+        f"├ Jami: <b>{stats.total}</b>\n"
+        f"├ 🟢 Faol: <b>{stats.active}</b>\n"
+        f"├ ⏳ Kutilmoqda: <b>{stats.pending}</b>\n"
+        f"├ ⚪ Tugagan: <b>{stats.expired}</b>\n"
+        f"└ 🚫 Bekor qilingan: <b>{stats.revoked}</b>\n\n"
+        "🎁 <b>BONUS TURLARI</b>\n"
+        f"├ 🎁 Welcome: <b>{welcome.total}</b>\n"
+        f"├ 🎟 Promo: <b>{promo.total}</b>\n"
+        f"├ 🤝 Referral: <b>{referral.total}</b>\n"
+        f"└ 👨‍💼 Admin: <b>{admin_bonus.total}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "📦 <b>WELCOME</b>\n"
+        f"├ Jami: <b>{traffic.total_welcome}</b>\n"
+        f"├ 🟢 Faol: <b>{traffic.active}</b>\n"
+        f"├ ⏳ Navbatda: <b>{traffic.pending}</b>\n"
+        f"├ ⚪ Tugagan: <b>{traffic.expired}</b>\n"
+        f"├ Limit: <b>{format_traffic(traffic.total_limit_bytes)}</b>\n"
+        f"├ Ishlatilgan: <b>{format_traffic(traffic.total_used_bytes)}</b>\n"
+        f"└ Qolgan: <b>{format_traffic(traffic.remaining_bytes)}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🤝 <b>REFERRAL</b>\n"
+        f"├ Taklif qilgan: <b>{ref.total}</b>\n"
+        f"├ ✅ Rewardga aylangan: <b>{ref.rewarded}</b>\n"
+        f"├ ⏳ Hali xarid qilmagan: <b>{ref.pending}</b>\n"
+        f"├ 🎁 Referral bonuslari: <b>{referral.total}</b>\n"
+        f"└ 📅 Jami bonus muddati: <b>{ref.total_reward_days} kun</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🎟 <b>PROMO</b>\n"
+        f"├ Redeem qilingan: <b>{promo_stats.redemptions}</b>\n"
+        f"├ 🎁 Promo bonuslari: <b>{promo_stats.bonuses}</b>\n"
+        f"├ 🟢 Faol: <b>{promo_stats.active}</b>\n"
+        f"├ ⏳ Kutilmoqda: <b>{promo_stats.pending}</b>\n"
+        f"├ ⚪ Tugagan: <b>{promo_stats.expired}</b>\n"
+        f"└ 📅 Jami bonus muddati: <b>{promo_stats.total_duration_days} kun</b>"
+    )
+
+    await callback.answer()
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=bonus_user_statistics_keyboard(user_id),
+    )
+
+
+
+@router.callback_query(F.data.startswith("search_bonus_history:"))
+async def search_bonus_history(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id,
+    )
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(user_id=user_id)
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+        bonus_result = await session.execute(
+            select(UserBonus)
+            .options(selectinload(UserBonus.traffic))
+            .where(UserBonus.user_id == user_id)
+            .order_by(
+                UserBonus.created_at.desc(),
+                UserBonus.id.desc(),
+            )
+        )
+        bonuses = list(bonus_result.scalars().all())
+
+        promo_result = await session.execute(
+            select(PromoRedemption, Promo)
+            .join(Promo, Promo.id == PromoRedemption.promo_id)
+            .where(PromoRedemption.user_id == user_id)
+        )
+        promo_by_bonus = {
+            redemption.bonus_id: promo
+            for redemption, promo in promo_result.all()
+        }
+
+    if not bonuses:
+        text = (
+            "📜 <b>BONUSLAR TARIXI</b>\n\n"
+            "Hozircha bonuslar mavjud emas."
+        )
+    else:
+        lines = [
+            "📜 <b>BONUSLAR TARIXI</b>",
+            "",
+        ]
+
+        type_names = {
+            "welcome": "🎁 Welcome Bonus",
+            "promo": "🎟 Promo Bonus",
+            "referral": "🤝 Referral Bonus",
+            "admin": "👨‍💼 Admin Bonus",
+        }
+        status_names = {
+            "active": "🟢 Faol",
+            "pending": "⏳ Kutilmoqda",
+            "expired": "⚪ Tugagan",
+            "revoked": "🚫 Bekor qilingan",
+        }
+
+        for index, bonus in enumerate(bonuses, start=1):
+            name = type_names.get(
+                bonus.bonus_type,
+                bonus.bonus_type,
+            )
+            number = (
+                f" #{bonus.bonus_number}"
+                if bonus.bonus_number is not None
+                else ""
+            )
+            status = status_names.get(
+                bonus.status,
+                f"⚪ {escape(bonus.status)}",
+            )
+
+            lines.append(f"<b>{index}.</b> {name}{number}")
+            lines.append(
+                f"   ⏳ Muddat: <b>{bonus.duration_days} kun</b>"
+            )
+
+            if bonus.bonus_type == "welcome" and bonus.traffic:
+                limit = bonus.traffic.traffic_limit_bytes
+                used = bonus.traffic.traffic_used_bytes
+                remaining = max(limit - used, 0)
+                lines.append(
+                    f"   📦 Limit: <b>{format_traffic(limit)}</b>"
+                )
+                lines.append(
+                    f"   📊 Ishlatilgan: <b>{format_traffic(used)}</b>"
+                )
+                lines.append(
+                    f"   📉 Qolgan: <b>{format_traffic(remaining)}</b>"
+                )
+            elif bonus.bonus_type in {"promo", "referral", "admin"}:
+                lines.append("   📡 Trafik: <b>Cheksiz</b>")
+
+            if bonus.bonus_type == "promo":
+                promo = promo_by_bonus.get(bonus.id)
+                if promo is not None:
+                    lines.append(
+                        f"   🔑 Promokod: <code>{escape(promo.code)}</code>"
+                    )
+
+            if bonus.bonus_type == "admin" and bonus.reason:
+                lines.append(
+                    f"   📝 Sabab: {escape(bonus.reason)}"
+                )
+
+            if bonus.bonus_type == "referral" and bonus.referral_id:
+                lines.append(
+                    f"   🔢 Referral: <b>#{bonus.bonus_number}</b>"
+                )
+
+            lines.append(f"   {status}")
+            lines.append(
+                f"   📅 Yaratilgan: {format_datetime(bonus.created_at)}"
+            )
+            lines.append("")
+
+        text = "\n".join(lines).rstrip()
+
+    await callback.answer()
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=bonus_user_statistics_keyboard(user_id),
+    )
+
+
+@router.callback_query(F.data.startswith("search_bonus_stats_back:"))
+async def search_bonus_statistics_back(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+
+    admin = await get_admin(
+        telegram_id=callback.from_user.id,
+    )
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        user = await user_service.get_by_id(user_id=user_id)
+        if user is None:
+            await callback.answer(
+                "Foydalanuvchi topilmadi.",
+                show_alert=True,
+            )
+            return
+
+    await callback.answer()
+    await show_user_search_result(
+        message=callback.message,
+        user=user,
+    )
 
 
 # ============================================================
@@ -2679,9 +2966,7 @@ async def admin_section_back(
         return
 
     await callback.answer()
-    await replace_with_admin_panel(
-        message=callback.message,
-    )
+    await _replace_callback_with_admin_panel(callback)
 
 
 @router.callback_query(
@@ -2703,9 +2988,7 @@ async def search_admin_panel(
 
     await callback.answer()
 
-    await replace_with_admin_panel(
-        message=callback.message,
-    )
+    await _replace_callback_with_admin_panel(callback)
 
 
 @router.callback_query(
@@ -3025,9 +3308,7 @@ async def all_subscription_history_back(
 
     await callback.answer()
 
-    await replace_with_admin_panel(
-        message=callback.message,
-    )
+    await _replace_callback_with_admin_panel(callback)
 
 
 async def show_all_subscription_history(
@@ -3379,6 +3660,285 @@ async def search_subscription_history(
             total_pages=total_pages,
         ),
     )
+
+
+
+def bonus_statistics_keyboard(
+    period_days: int | None,
+) -> InlineKeyboardMarkup:
+    selected = period_days
+
+    def label(days: int | None, text: str) -> str:
+        return (
+            f"✅ {text}"
+            if days == selected
+            else text
+        )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=label(0, "📅 Bugun"),
+                    callback_data="bonus_stats:today",
+                ),
+                InlineKeyboardButton(
+                    text=label(7, "7 kun"),
+                    callback_data="bonus_stats:7",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=label(30, "30 kun"),
+                    callback_data="bonus_stats:30",
+                ),
+                InlineKeyboardButton(
+                    text=label(None, "Barcha vaqt"),
+                    callback_data="bonus_stats:all",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📦 Welcome trafik",
+                    callback_data=(
+                        f"bonus_stats:welcome:{period_days or 'all'}"
+                    ),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🤝 Referral statistikasi",
+                    callback_data=(
+                        f"bonus_stats:referral:{period_days or 'all'}"
+                    ),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Admin panel",
+                    callback_data="bonus_stats:back",
+                ),
+            ],
+        ]
+    )
+
+
+def bonus_user_statistics_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 Yangilash",
+                    callback_data=f"search_bonus_stats:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📜 Bonuslar tarixi",
+                    callback_data=f"search_bonus_history:{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Qidiruv natijasiga qaytish",
+                    callback_data=f"search_bonus_stats_back:{user_id}",
+                ),
+            ],
+        ]
+    )
+
+
+def _bonus_type_line(
+    stats,
+    title: str,
+) -> str:
+    return (
+        f"{title}: <b>{stats.total}</b> "
+        f"(🟢 {stats.active} / ⏳ {stats.pending} / "
+        f"⚪ {stats.expired} / 🚫 {stats.revoked})"
+    )
+
+
+def _period_title(period_days: int | None) -> str:
+    if period_days == 0:
+        return "BUGUN"
+    if period_days == 7:
+        return "SO‘NGGI 7 KUN"
+    if period_days == 30:
+        return "SO‘NGGI 30 KUN"
+    return "BARCHA VAQT"
+
+
+def _render_bonus_statistics(stats) -> str:
+    welcome = stats.by_type.get("welcome", BonusTypeStats())
+    promo = stats.by_type.get("promo", BonusTypeStats())
+    referral = stats.by_type.get("referral", BonusTypeStats())
+    admin = stats.by_type.get("admin", BonusTypeStats())
+    traffic = stats.welcome_traffic
+    ref = stats.referral
+    promo_stats = stats.promo
+
+    return (
+        f"🎁 <b>BONUSLAR STATISTIKASI — "
+        f"{_period_title(stats.period_days)}</b>\n\n"
+        f"👥 <b>Jami berilgan bonuslar:</b> {stats.total}\n"
+        f"🟢 Faol: <b>{stats.active}</b>\n"
+        f"⏳ Kutilmoqda: <b>{stats.pending}</b>\n"
+        f"⚪ Tugagan: <b>{stats.expired}</b>\n"
+        f"🚫 Bekor qilingan: <b>{stats.revoked}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🎁 <b>BONUS TURLARI</b>\n"
+        f"{_bonus_type_line(welcome, '🎁 Welcome')}\n"
+        f"{_bonus_type_line(promo, '🎟 Promo')}\n"
+        f"{_bonus_type_line(referral, '🤝 Referral')}\n"
+        f"{_bonus_type_line(admin, '👨‍💼 Admin')}\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🤝 <b>REFERRAL</b>\n"
+        f"👥 Jami referral: <b>{ref.total}</b>\n"
+        f"✅ Mukofotga aylangan: <b>{ref.rewarded}</b>\n"
+        f"⏳ Hali xarid qilmagan: <b>{ref.pending}</b>\n"
+        f"🎁 3 kunlik reward: <b>{ref.reward_3_days}</b>\n"
+        f"🎁 7 kunlik reward: <b>{ref.reward_7_days}</b>\n"
+        f"📅 Jami berilgan muddat: <b>{ref.total_reward_days} kun</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🎟 <b>PROMO</b>\n"
+        f"🔑 Redeem qilingan: <b>{promo_stats.redemptions}</b>\n"
+        f"🎁 Promo bonuslari: <b>{promo_stats.bonuses}</b>\n"
+        f"📅 Jami bonus muddati: <b>{promo_stats.total_duration_days} kun</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "📦 <b>WELCOME TRAFFIC</b>\n"
+        f"👥 Welcome bonuslar: <b>{traffic.total_welcome}</b>\n"
+        f"🟢 Faollashgan: <b>{traffic.active}</b>\n"
+        f"⏳ Navbatda: <b>{traffic.pending}</b>\n"
+        f"⚪ Tugagan: <b>{traffic.expired}</b>\n"
+        f"📦 Jami limit: <b>{format_traffic(traffic.total_limit_bytes)}</b>\n"
+        f"📊 Ishlatilgan: <b>{format_traffic(traffic.total_used_bytes)}</b>\n"
+        f"📉 Qolgan: <b>{format_traffic(traffic.remaining_bytes)}</b>\n"
+        f"⚠️ 500 MB warning: <b>{traffic.warning_500mb_sent}</b>\n"
+        f"🚫 3 GB tugagan: <b>{traffic.exhausted}</b>"
+    )
+
+
+async def _show_bonus_statistics(
+    message: Message,
+    period_days: int | None = None,
+):
+    async with async_session() as session:
+        service = BonusStatisticsService(session)
+        stats = await service.get_global_statistics(
+            period_days=period_days,
+        )
+
+    return await message.answer(
+        _render_bonus_statistics(stats),
+        parse_mode="HTML",
+        reply_markup=bonus_statistics_keyboard(period_days),
+    )
+
+
+@router.message(F.text == "🎁 Bonuslar")
+async def bonus_statistics_entry(message: Message):
+    admin = await get_admin(
+        telegram_id=message.from_user.id,
+    )
+    if admin is None or not admin.is_admin:
+        return
+
+    await delete_last_admin_message(message)
+    sent = await _show_bonus_statistics(message, period_days=None)
+    await remember_admin_message(sent)
+
+
+@router.callback_query(F.data.startswith("bonus_stats:"))
+async def bonus_statistics_callback(callback: CallbackQuery):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id,
+    )
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+
+    parts = callback.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+
+    if action == "back":
+        await callback.answer()
+        await _replace_callback_with_admin_panel(callback)
+        return
+
+    if action in {"today", "7", "30", "all"}:
+        period_days = {
+            "today": 0,
+            "7": 7,
+            "30": 30,
+            "all": None,
+        }[action]
+
+        async with async_session() as session:
+            service = BonusStatisticsService(session)
+            stats = await service.get_global_statistics(
+                period_days=period_days,
+            )
+
+        await callback.answer()
+        await callback.message.edit_text(
+            _render_bonus_statistics(stats),
+            parse_mode="HTML",
+            reply_markup=bonus_statistics_keyboard(period_days),
+        )
+        return
+
+    if action in {"welcome", "referral"}:
+        period_value = parts[2] if len(parts) > 2 else "all"
+        period_days = (
+            None
+            if period_value == "all"
+            else int(period_value)
+        )
+
+        async with async_session() as session:
+            service = BonusStatisticsService(session)
+            stats = await service.get_global_statistics(
+                period_days=period_days,
+            )
+
+        await callback.answer()
+        if action == "welcome":
+            traffic = stats.welcome_traffic
+            text = (
+                f"📦 <b>WELCOME TRAFFIC — "
+                f"{_period_title(period_days)}</b>\n\n"
+                f"👥 Jami Welcome: <b>{traffic.total_welcome}</b>\n"
+                f"🟢 Faollashgan: <b>{traffic.active}</b>\n"
+                f"⏳ Navbatda: <b>{traffic.pending}</b>\n"
+                f"⚪ Tugagan: <b>{traffic.expired}</b>\n\n"
+                f"📦 Jami limit: <b>{format_traffic(traffic.total_limit_bytes)}</b>\n"
+                f"📊 Ishlatilgan: <b>{format_traffic(traffic.total_used_bytes)}</b>\n"
+                f"📉 Qolgan: <b>{format_traffic(traffic.remaining_bytes)}</b>\n\n"
+                f"⚠️ 500 MB warning: <b>{traffic.warning_500mb_sent}</b>\n"
+                f"🚫 3 GB tugagan: <b>{traffic.exhausted}</b>"
+            )
+        else:
+            ref = stats.referral
+            text = (
+                f"🤝 <b>REFERRAL STATISTIKASI — "
+                f"{_period_title(period_days)}</b>\n\n"
+                f"👥 Jami referral: <b>{ref.total}</b>\n"
+                f"✅ Mukofotga aylangan: <b>{ref.rewarded}</b>\n"
+                f"⏳ Hali xarid qilmagan: <b>{ref.pending}</b>\n\n"
+                f"🎁 3 kunlik reward: <b>{ref.reward_3_days}</b>\n"
+                f"🎁 7 kunlik reward: <b>{ref.reward_7_days}</b>\n"
+                f"📅 Jami berilgan muddat: <b>{ref.total_reward_days} kun</b>"
+            )
+
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=bonus_statistics_keyboard(period_days),
+        )
+        return
+
+    await callback.answer("Noma’lum amal.", show_alert=True)
 
 
 @router.message(F.text == "📊 Statistika")

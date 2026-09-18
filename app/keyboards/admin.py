@@ -21,6 +21,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔎 Qidiruv"),
         ],
         [
+            KeyboardButton(text="🎁 Bonuslar"),
+        ],
+        [
             KeyboardButton(text="📩 Murojaatlar"),
         ],
         [
@@ -201,12 +204,6 @@ def admin_user_search_actions_keyboard(
             InlineKeyboardButton(
                 text="🛠 Muddatni boshqarish",
                 callback_data=f"admin_user_extend:{user_id}",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="🎁 Admin Bonus berish",
-                callback_data=f"admin_user_bonus:{user_id}",
             ),
         ],
     ]

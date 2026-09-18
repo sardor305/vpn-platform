@@ -1,5 +1,4 @@
 from datetime import datetime
-from html import escape
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
@@ -58,53 +57,17 @@ def get_bonus_name(bonus_type: str) -> str:
     )
 
 
-def format_queue_item(index: int, detail: dict) -> str:
-    period = detail["period"]
-    service_type = period.service_type
-
-    if service_type == "paid":
-        name = "📦 Oylik obuna"
-        source_line = ""
-    elif service_type == "daily":
-        name = "📅 Kunlik obuna"
-        source_line = ""
-    elif service_type == "promo":
-        number = detail.get("bonus_number")
-        source = detail.get("source")
-        name = f"🏷 Promo #{number}" if number is not None else "🏷 Promo"
-        source_line = (
-            f"   🎟 Kod: <code>{escape(str(source))}</code>\n"
-            if source
-            else ""
-        )
-    elif service_type == "referral":
-        number = detail.get("bonus_number")
-        source = detail.get("source")
-        name = (
-            f"👥 Referral #{number}"
-            if number is not None
-            else "👥 Referral"
-        )
-        source_line = (
-            f"   👤 ID: <code>{escape(str(source))}</code>\n"
-            if source
-            else ""
-        )
-    elif service_type == "admin":
-        number = detail.get("bonus_number")
-        name = (
-            f"🛠 Admin Bonus #{number}"
-            if number is not None
-            else "🛠 Admin Bonus"
-        )
-        source_line = ""
-    else:
-        name = get_bonus_name(service_type)
-        source_line = ""
+def format_queue_item(index: int, period) -> str:
+    name = (
+        "📦 Oylik obuna"
+        if period.service_type == "paid"
+        else "📅 Kunlik obuna"
+        if period.service_type == "daily"
+        else get_bonus_name(period.service_type)
+    )
 
     return (
         f"{index}️⃣ {name}\n"
-        f"{source_line}"
         f"   ⏳ Muddat: <b>{period.duration_days} kun</b>\n"
         f"   📅 {format_datetime(period.start_date)} → "
         f"{format_datetime(period.end_date)}"
@@ -130,8 +93,27 @@ def format_bonus_history(bonuses: list) -> str:
         )
 
         lines.append(
-            f"• {name} — <b>{bonus.duration_days} kun</b> "
-            f"({status})"
+            f"• {name}"
+        )
+        lines.append(
+            f"  ⏳ {bonus.duration_days} kun"
+        )
+
+        if (
+            bonus.bonus_type.lower() == "welcome"
+            and getattr(bonus, "traffic", None) is not None
+        ):
+            traffic = bonus.traffic
+            limit_gb = (
+                traffic.traffic_limit_bytes
+                / (1024 ** 3)
+            )
+            lines.append(
+                f"  📦 {limit_gb:.0f} GB"
+            )
+
+        lines.append(
+            f"  {status}"
         )
 
     return "\n".join(lines)
@@ -253,62 +235,9 @@ def build_current_service_text(info: dict) -> str:
 
     else:
         item = active_bonus
-        current_source = info.get("current_service_source")
-
-        if item.bonus_type.lower() == "promo":
-            number = (
-                current_source.get("bonus_number")
-                if current_source
-                else getattr(item, "bonus_number", None)
-            )
-            source = current_source.get("source") if current_source else None
-            title = (
-                f"🏷 Promo #{number}"
-                if number is not None
-                else "🏷 Promo"
-            )
-            source_line = (
-                f"🎟 Kod: <code>{escape(str(source))}</code>"
-                if source
-                else ""
-            )
-        elif item.bonus_type.lower() == "referral":
-            number = (
-                current_source.get("bonus_number")
-                if current_source
-                else getattr(item, "bonus_number", None)
-            )
-            source = current_source.get("source") if current_source else None
-            title = (
-                f"👥 Referral #{number}"
-                if number is not None
-                else "👥 Referral"
-            )
-            source_line = (
-                f"👤 ID: <code>{escape(str(source))}</code>"
-                if source
-                else ""
-            )
-        elif item.bonus_type.lower() == "admin":
-            number = (
-                current_source.get("bonus_number")
-                if current_source
-                else getattr(item, "bonus_number", None)
-            )
-            title = (
-                f"🛠 Admin Bonus #{number}"
-                if number is not None
-                else "🛠 Admin Bonus"
-            )
-            source_line = ""
-        else:
-            title = get_bonus_name(item.bonus_type)
-            source_line = ""
-
         lines.extend(
             [
-                title,
-                *([source_line] if source_line else []),
+                get_bonus_name(item.bonus_type),
                 f"⏳ Muddat: <b>{item.duration_days} kun</b>",
                 f"📅 Boshlangan sana: "
                 f"<b>{format_datetime(item.start_date)}</b>",
@@ -366,9 +295,9 @@ def build_vpn_text(
 
 
 def build_queue_text(info: dict) -> str:
-    details = info.get("pending_queue_details") or []
+    queue = info["pending_queue"]
 
-    if not details:
+    if not queue:
         return ""
 
     lines = [
@@ -376,8 +305,10 @@ def build_queue_text(info: dict) -> str:
         "",
     ]
 
-    for index, detail in enumerate(details, start=1):
-        lines.append(format_queue_item(index, detail))
+    for index, period in enumerate(queue, start=1):
+        lines.append(
+            format_queue_item(index, period)
+        )
         lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -433,6 +364,10 @@ async def my_subscription(message: Message):
 
         queue_text = build_queue_text(info)
 
+        pending_summary = format_pending_bonus_summary(
+            info["pending_bonuses"]
+        )
+
         history_text = format_bonus_history(
             info["bonus_history"]
         )
@@ -447,6 +382,9 @@ async def my_subscription(message: Message):
 
         if queue_text:
             sections.append(queue_text)
+
+        if pending_summary:
+            sections.append(pending_summary)
 
         if history_text:
             sections.append(history_text)
