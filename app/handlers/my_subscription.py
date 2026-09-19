@@ -10,6 +10,7 @@ from app.keyboards.subscription_keyboard import subscription_keyboard
 from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.service_access_service import ServiceAccessService
 from app.services.subscription_info_service import SubscriptionInfoService
+from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 
 
@@ -93,24 +94,10 @@ def format_bonus_history(bonuses: list) -> str:
             bonus.status,
         )
 
-        lines.append(f"• {name}")
         lines.append(
-            f"  ⏳ {bonus.duration_days} kun"
+            f"• {name} — <b>{bonus.duration_days} kun</b> "
+            f"({status})"
         )
-
-        if bonus.bonus_type.lower() == "welcome":
-            traffic = getattr(bonus, "traffic", None)
-
-            if traffic is not None:
-                limit_gb = (
-                    traffic.traffic_limit_bytes
-                    / (1024 ** 3)
-                )
-                lines.append(
-                    f"  📦 {limit_gb:.0f} GB"
-                )
-
-        lines.append(f"  {status}")
 
     return "\n".join(lines)
 
@@ -160,6 +147,73 @@ def format_pending_bonus_summary(bonuses: list) -> str:
     return "\n".join(lines).rstrip()
 
 
+def format_subscription_history_item(
+    number: int,
+    subscription,
+) -> str:
+    status = {
+        "active": "🟢 Faol",
+        "pending": "⏳ Kutilmoqda",
+        "expired": "⚪ Tugagan",
+        "revoked": "🔴 Bekor qilingan",
+    }.get(
+        subscription.status,
+        subscription.status,
+    )
+
+    plan_name = (
+        subscription.plan.name
+        if subscription.plan is not None
+        else "Noma'lum tarif"
+    )
+
+    return (
+        f"🔹 <b>Obuna #{number}</b>\n"
+        f"📦 Tarif: <b>{plan_name}</b>\n"
+        f"💰 Narxi: <b>{subscription.plan.price} ₽</b>\n"
+        f"📅 Boshlangan sana: "
+        f"<b>{format_datetime(subscription.start_date)}</b>\n"
+        f"⏳ Tugash sanasi: "
+        f"<b>{format_datetime(subscription.end_date)}</b>\n"
+        f"{status}"
+    )
+
+
+def format_subscription_history(
+    subscriptions: list,
+) -> str:
+    if not subscriptions:
+        return (
+            "📜 <b>OBUNALAR TARIXI</b>\n\n"
+            "Hozircha oylik obunalar tarixi mavjud emas."
+        )
+
+    # Repository returns newest first. Display numbering chronologically,
+    # so the oldest record is #1 and the newest is the highest number.
+    ordered = list(reversed(subscriptions))
+
+    lines = [
+        "📜 <b>OBUNALAR TARIXI</b>",
+        "",
+        f"📊 Jami obunalar: <b>{len(ordered)}</b>",
+        "",
+    ]
+
+    for number, subscription in enumerate(
+        ordered,
+        start=1,
+    ):
+        lines.append(
+            format_subscription_history_item(
+                number=number,
+                subscription=subscription,
+            )
+        )
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
 async def get_marzban_status(username: str) -> str | None:
     try:
         marzban_service = create_marzban_service()
@@ -178,6 +232,32 @@ async def get_marzban_status(username: str) -> str | None:
         return None
 
 
+async def get_subscription_display_number(
+    subscription_service: SubscriptionService,
+    user_id: int,
+    subscription_id: int,
+) -> int | None:
+    """Return a paid subscription's chronological display number.
+
+    Numbering is display-only: the oldest subscription is #1 and the
+    newest subscription is #N. No database column is required.
+    """
+    subscriptions = await subscription_service.get_subscription_history(
+        user_id,
+    )
+
+    chronological = list(reversed(subscriptions))
+
+    for number, subscription in enumerate(
+        chronological,
+        start=1,
+    ):
+        if subscription.id == subscription_id:
+            return number
+
+    return None
+
+
 def build_current_service_text(info: dict) -> str:
     current_service = info["current_service"]
     subscription = info["subscription"]
@@ -194,6 +274,15 @@ def build_current_service_text(info: dict) -> str:
 
     if current_service.service_type == "paid":
         item = subscription
+
+        subscription_number = info.get(
+            "subscription_number"
+        )
+
+        if subscription_number is not None:
+            lines.append(
+                f"💳 Obuna: <b>#{subscription_number}</b>"
+            )
 
         lines.extend(
             [
@@ -333,6 +422,24 @@ async def my_subscription(message: Message):
             user.id
         )
 
+        if info is not None:
+            subscription_service = SubscriptionService(
+                session
+            )
+
+            if (
+                info["current_service"] is not None
+                and info["current_service"].service_type == "paid"
+            ):
+                current_subscription = info["current_service"].item
+                info["subscription_number"] = (
+                    await get_subscription_display_number(
+                        subscription_service=subscription_service,
+                        user_id=user.id,
+                        subscription_id=current_subscription.id,
+                    )
+                )
+
         if info is None:
             await message.answer(
                 "❌ Sizda hozircha xizmat yoki bonus mavjud emas.\n\n"
@@ -409,6 +516,157 @@ async def my_subscription(message: Message):
             parse_mode="HTML",
             reply_markup=keyboard,
         )
+
+
+@router.callback_query(F.data == "subscription_history")
+async def subscription_history(
+    callback: CallbackQuery,
+):
+    await callback.answer()
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        subscription_service = SubscriptionService(session)
+
+        user = await user_service.get_by_telegram_id(
+            telegram_id=callback.from_user.id,
+        )
+
+        if user is None:
+            await callback.message.edit_text(
+                "❌ Foydalanuvchi topilmadi.",
+                reply_markup=user_navigation_keyboard(),
+            )
+            return
+
+        subscriptions = (
+            await subscription_service.get_subscription_history(
+                user.id,
+            )
+        )
+
+    await callback.message.edit_text(
+        format_subscription_history(subscriptions),
+        parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="subscription_history_back",
+            close_callback="user_close",
+        ),
+    )
+
+
+@router.callback_query(F.data == "subscription_history_back")
+async def subscription_history_back(
+    callback: CallbackQuery,
+):
+    await callback.answer()
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        service_access_service = ServiceAccessService(session)
+        subscription_info_service = SubscriptionInfoService(session)
+
+        user, _ = await user_service.get_or_create_user(
+            telegram_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
+            last_name=callback.from_user.last_name,
+            language_code=callback.from_user.language_code,
+        )
+
+        try:
+            await service_access_service.sync_user(
+                user_id=user.id
+            )
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            print(
+                "SUBSCRIPTION HISTORY BACK SYNC ERROR:",
+                repr(exc),
+            )
+
+        info = await subscription_info_service.get_info(
+            user.id
+        )
+
+        if info is not None:
+            subscription_service = SubscriptionService(
+                session
+            )
+
+            if (
+                info["current_service"] is not None
+                and info["current_service"].service_type == "paid"
+            ):
+                current_subscription = info["current_service"].item
+                info["subscription_number"] = (
+                    await get_subscription_display_number(
+                        subscription_service=subscription_service,
+                        user_id=user.id,
+                        subscription_id=current_subscription.id,
+                    )
+                )
+
+    if info is None:
+        await callback.message.edit_text(
+            "❌ Sizda hozircha xizmat yoki bonus mavjud emas.",
+            parse_mode="HTML",
+            reply_markup=user_navigation_keyboard(),
+        )
+        return
+
+    current_service_text = build_current_service_text(info)
+    vpn_text = (
+        build_vpn_text(info)
+        if info["current_service"] is not None
+        else ""
+    )
+    queue_text = build_queue_text(info)
+    pending_summary = format_pending_bonus_summary(
+        info["pending_bonuses"]
+    )
+    history_text = format_bonus_history(
+        info["bonus_history"]
+    )
+
+    sections = [
+        section
+        for section in (
+            current_service_text,
+            vpn_text,
+            queue_text,
+            pending_summary,
+            history_text,
+        )
+        if section
+    ]
+
+    text = "\n\n".join(sections)
+
+    keyboard = None
+
+    if (
+        info["current_service"] is not None
+        and info["vpn_account"] is None
+    ):
+        keyboard = subscription_keyboard(
+            show_create_vpn=True
+        )
+    elif info["vpn_account"] is not None:
+        subscription_url = (
+            f"{config.MARZBAN_PUBLIC_URL}"
+            f"{info['vpn_account'].subscription_url}"
+        )
+        keyboard = subscription_keyboard(
+            subscription_url=subscription_url
+        )
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
 
 
 @router.callback_query(F.data == "subscription:create_vpn")

@@ -238,7 +238,7 @@ async def view_ticket(
     keyboard.inline_keyboard.append(
         [
             InlineKeyboardButton(
-                text="⬅️ Admin panel",
+                text="↩️ Ortga",
                 callback_data="support_admin_panel_back",
             )
         ]

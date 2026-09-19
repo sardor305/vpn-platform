@@ -23,6 +23,9 @@ from app.keyboards.admin import (
     vpn_account_actions_keyboard,
     vpn_accounts_keyboard,
 )
+from app.keyboards.plan_admin import (
+    admin_plans_keyboard,
+)
 from app.keyboards.menu import main_menu
 from app.models.daily_subscription import DailySubscription
 from app.models.promo import Promo
@@ -100,6 +103,58 @@ async def daily_price_change(
     )
 
 
+@router.callback_query(
+    F.data == "daily_price:back"
+)
+async def daily_price_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+
+    async with async_session() as session:
+        plan_service = PlanService(session)
+        plans = await plan_service.get_all_plans()
+
+        setting_service = SettingService(
+            session=session,
+        )
+        daily_price = await setting_service.get_daily_price()
+
+    text = (
+        "📦 <b>Tariflar</b>\n\n"
+        f"💰 1 kunlik narx: <b>{daily_price} RUB</b>\n\n"
+    )
+
+    if plans:
+        text += "Kerakli tarifni tanlang:"
+    else:
+        text += "Hozircha tariflar mavjud emas."
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=(
+            admin_plans_keyboard(plans)
+            if plans
+            else admin_back_keyboard("admin_plan_back")
+        ),
+    )
+
+    await callback.answer()
+
+
 @router.message(
     AdminSearchStates.waiting_for_daily_price
 )
@@ -154,23 +209,6 @@ async def process_daily_price(
         parse_mode="HTML",
         reply_markup=admin_menu,
     )
-
-
-@router.callback_query(F.data == "daily_price:back")
-async def daily_price_back(callback: CallbackQuery):
-    admin = await get_admin(
-        telegram_id=callback.from_user.id
-    )
-
-    if admin is None or not admin.is_admin:
-        await callback.answer(
-            "Ruxsat yo‘q.",
-            show_alert=True,
-        )
-        return
-
-    await callback.answer()
-    await _replace_callback_with_admin_panel(callback)
 
 
 async def _replace_callback_with_admin_panel(
@@ -3006,23 +3044,6 @@ async def search_admin_panel(
 
     await callback.answer()
 
-    await _replace_callback_with_admin_panel(callback)
-
-
-@router.callback_query(F.data == "admin_user_search_back")
-async def admin_user_search_back(callback: CallbackQuery):
-    admin = await get_admin(
-        telegram_id=callback.from_user.id
-    )
-
-    if admin is None or not admin.is_admin:
-        await callback.answer(
-            "Ruxsat yo‘q.",
-            show_alert=True,
-        )
-        return
-
-    await callback.answer()
     await _replace_callback_with_admin_panel(callback)
 
 

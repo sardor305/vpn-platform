@@ -24,7 +24,7 @@ async def buy_subscription(message: Message):
         "🛒 <b>OBUNA SOTIB OLISH</b>\n\n"
         "Kerakli obuna turini tanlang:",
         parse_mode="HTML",
-        reply_markup=buy_menu_keyboard(),
+        reply_markup=_buy_menu_with_back_keyboard(),
     )
 
 
@@ -85,8 +85,22 @@ async def buy_back(callback: CallbackQuery):
         "🛒 <b>OBUNA SOTIB OLISH</b>\n\n"
         "Kerakli obuna turini tanlang:",
         parse_mode="HTML",
-        reply_markup=buy_menu_keyboard(),
+        reply_markup=_buy_menu_with_back_keyboard(),
     )
+
+
+def _buy_menu_with_back_keyboard() -> InlineKeyboardMarkup:
+    keyboard = buy_menu_keyboard()
+    rows = [list(row) for row in keyboard.inline_keyboard]
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="↩️ Ortga",
+                callback_data="user_back",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _with_navigation(

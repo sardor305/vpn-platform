@@ -1,10 +1,9 @@
 from aiogram import F, Router
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
-from app.keyboards.help import help_keyboard
 from app.keyboards.menu import main_menu
-from app.keyboards.phone import phone_keyboard
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.user_service import UserService
 
 
@@ -52,8 +51,8 @@ async def help_handler(message: Message):
     await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=help_keyboard(
-            has_phone=bool(user.phone_number)
+        reply_markup=user_navigation_keyboard(
+            back_callback="help_back",
         ),
     )
 
@@ -63,5 +62,22 @@ async def back_to_main_menu(message: Message):
 
     await message.answer(
         "🏠 Asosiy menyu",
+        reply_markup=main_menu,
+    )
+
+
+@router.callback_query(F.data == "help_back")
+async def help_back(callback: CallbackQuery):
+    await callback.answer()
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="🏠 <b>ASOSIY MENYU</b>",
+        parse_mode="HTML",
         reply_markup=main_menu,
     )

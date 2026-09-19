@@ -27,20 +27,21 @@ def subscription_keyboard(
             ]
         )
 
-    rows.extend(
+    rows.append(
         [
-            [
-                InlineKeyboardButton(
-                    text="↩️ Ortga",
-                    callback_data="user_back",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="❌ Yopish",
-                    callback_data="user_close",
-                ),
-            ],
+            InlineKeyboardButton(
+                text="📜 Obunalar tarixi",
+                callback_data="subscription_history",
+            ),
+        ]
+    )
+
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="↩️ Ortga",
+                callback_data="user_back",
+            ),
         ]
     )
 

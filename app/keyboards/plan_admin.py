@@ -91,3 +91,15 @@ def admin_plan_detail_keyboard(
     return InlineKeyboardMarkup(
         inline_keyboard=buttons
     )
+
+def admin_plan_input_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="↩️ Ortga",
+                    callback_data="admin_plan_create_back",
+                )
+            ]
+        ]
+    )

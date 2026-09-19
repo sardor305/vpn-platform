@@ -8,6 +8,7 @@ from app.database.database import async_session
 from app.keyboards.admin import admin_menu
 from app.keyboards.plan_admin import (
     admin_plan_detail_keyboard,
+    admin_plan_input_keyboard,
     admin_plans_keyboard,
 )
 from app.services.plan_service import PlanService
@@ -195,6 +196,54 @@ async def admin_plan_list(
 
 
 @router.callback_query(
+    F.data == "admin_plan_create_back"
+)
+async def admin_plan_create_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    admin = await get_admin_user(callback)
+
+    if admin is None:
+        await callback.answer(
+            "Ruxsat berilmagan.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+
+    async with async_session() as session:
+        plan_service = PlanService(session)
+        plans = await plan_service.get_all_plans()
+
+        setting_service = SettingService(session)
+        daily_price = await setting_service.get_daily_price()
+
+    text = (
+        "📦 <b>Tariflar</b>\n\n"
+        f"💰 1 kunlik narx: <b>{daily_price} RUB</b>\n\n"
+    )
+
+    if plans:
+        text += "Kerakli tarifni tanlang:"
+    else:
+        text += "Hozircha tariflar mavjud emas."
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=(
+            admin_plans_keyboard(plans)
+            if plans
+            else admin_back_keyboard("admin_plan_back")
+        ),
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(
     F.data == "admin_plan_create"
 )
 async def admin_plan_create(
@@ -218,9 +267,9 @@ async def admin_plan_create(
         "➕ <b>Yangi tarif</b>\n\n"
         "1️⃣ Tarif nomini kiriting.\n\n"
         "Masalan:\n"
-        "<code>Standard</code>\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "<code>Standard</code>",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
 
     await callback.answer()
@@ -272,9 +321,9 @@ async def admin_plan_name(
         f"📦 Tarif: <b>{escape(name)}</b>\n\n"
         "2️⃣ Tarif narxini kiriting.\n\n"
         "Faqat butun son kiriting.\n"
-        "Masalan: <code>300</code>\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Masalan: <code>300</code>",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
 
 
@@ -322,9 +371,9 @@ async def admin_plan_price(
     await message.answer(
         "3️⃣ Tarif amal qilish muddatini kiriting.\n\n"
         "Kunlarda, faqat butun son.\n"
-        "Masalan: <code>30</code>\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Masalan: <code>30</code>",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
 
 

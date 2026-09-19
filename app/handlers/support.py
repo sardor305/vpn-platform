@@ -2,10 +2,15 @@ from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from app.database.database import async_session
-from app.keyboards.help import help_keyboard
+from app.keyboards.menu import main_menu
 from app.keyboards.support_admin import (
     ticket_keyboard,
 )
@@ -23,10 +28,46 @@ from app.services.support_ticket_service import (
 )
 from app.services.user_service import UserService
 from app.states.support import SupportStates
-from app.states.plan import PlanStates
 
 
 router = Router()
+
+
+def support_back_keyboard() -> InlineKeyboardMarkup:
+    """Return the single back button used by support screens."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="↩️ Ortga",
+                    callback_data="support_back",
+                )
+            ]
+        ]
+    )
+
+
+@router.callback_query(F.data == "support_back")
+async def support_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    await state.clear()
+    await callback.answer()
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="🏠 <b>ASOSIY MENYU</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu,
+    )
+
+
 
 
 @router.message(F.text == "💬 Qo'llab-quvvatlash")
@@ -43,9 +84,9 @@ async def start_support(
         "Muammoingiz yoki savolingizni "
         "bitta xabar ko'rinishida yuboring.\n\n"
         "Masalan:\n"
-        "VPN ulanishida muammo yuzaga keldi.\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "VPN ulanishida muammo yuzaga keldi.",
         parse_mode="HTML",
+        reply_markup=support_back_keyboard(),
     )
 
 
@@ -184,16 +225,27 @@ async def my_tickets(
             "📂 <b>Murojaatlarim</b>\n\n"
             "Sizda hozircha murojaatlar mavjud emas.",
             parse_mode="HTML",
+            reply_markup=support_back_keyboard(),
         )
         return
+
+    keyboard = user_tickets_list_keyboard(
+        [ticket.id for ticket in tickets]
+    )
+    keyboard.inline_keyboard.append(
+        [
+            InlineKeyboardButton(
+                text="↩️ Ortga",
+                callback_data="support_back",
+            )
+        ]
+    )
 
     await message.answer(
         "📂 <b>Murojaatlarim</b>\n\n"
         "Kerakli murojaatni tanlang:",
         parse_mode="HTML",
-        reply_markup=user_tickets_list_keyboard(
-            [ticket.id for ticket in tickets]
-        ),
+        reply_markup=keyboard,
     )
 
 
@@ -301,6 +353,20 @@ async def view_user_ticket(
     else:
         reply_markup = None
 
+    if reply_markup is None:
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[]
+        )
+
+    reply_markup.inline_keyboard.append(
+        [
+            InlineKeyboardButton(
+                text="↩️ Ortga",
+                callback_data="support_back",
+            )
+        ]
+    )
+
     await callback.message.answer(
         text,
         parse_mode="HTML",
@@ -376,9 +442,9 @@ async def start_user_ticket_reply(
 
     await callback.message.answer(
         f"✍️ <b>Murojaat #{ticket_id}</b>\n\n"
-        "Javobingizni yozing.\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Javobingizni yozing.",
         parse_mode="HTML",
+        reply_markup=support_back_keyboard(),
     )
 
     await callback.answer()
@@ -397,9 +463,9 @@ async def start_new_ticket(
 
     await callback.message.answer(
         "✍️ <b>Yangi murojaat</b>\n\n"
-        "Muammoingiz yoki savolingizni yozing.\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Muammoingiz yoki savolingizni yozing.",
         parse_mode="HTML",
+        reply_markup=support_back_keyboard(),
     )
 
     await callback.answer()
@@ -531,62 +597,3 @@ async def receive_user_reply(
             ticket.id
         ),
     )
-
-
-@router.message(F.text == "/cancel")
-async def cancel_support(
-    message: Message,
-    state: FSMContext,
-):
-    current_state = await state.get_state()
-
-    support_states = (
-        SupportStates.waiting_for_message.state,
-        SupportStates.waiting_for_user_reply.state,
-    )
-
-    plan_states = (
-        PlanStates.waiting_for_name.state,
-        PlanStates.waiting_for_price.state,
-        PlanStates.waiting_for_duration.state,
-        PlanStates.waiting_for_edit_name.state,
-        PlanStates.waiting_for_edit_price.state,
-        PlanStates.waiting_for_edit_duration.state,
-    )
-
-    if current_state in support_states:
-
-        await state.clear()
-
-        async with async_session() as session:
-
-            user_service = UserService(session)
-
-            user = await user_service.get_by_telegram_id(
-                telegram_id=message.from_user.id
-            )
-
-        if user is None:
-            return
-
-        await message.answer(
-            "❌ Amal bekor qilindi.",
-            reply_markup=help_keyboard(
-                has_phone=bool(user.phone_number)
-            ),
-        )
-
-        return
-
-    if current_state in plan_states:
-
-        await state.clear()
-
-        from app.keyboards.admin import admin_menu
-
-        await message.answer(
-            "❌ Tarif bilan ishlash bekor qilindi.",
-            reply_markup=admin_menu,
-        )
-
-        return

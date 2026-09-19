@@ -16,6 +16,12 @@ def promo_admin_menu() -> InlineKeyboardMarkup:
                     callback_data="promo_admin:list",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="↩️ Ortga",
+                    callback_data="admin_section_back",
+                )
+            ],
         ]
     )
 

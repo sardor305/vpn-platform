@@ -21,7 +21,7 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔎 Qidiruv"),
         ],
         [
-            KeyboardButton(text="🎁 Bonuslar"),
+            KeyboardButton(text="🎁 Admin Bonus"),
         ],
         [
             KeyboardButton(text="📩 Murojaatlar"),
@@ -48,7 +48,6 @@ users_menu = ReplyKeyboardMarkup(
 
 
 def daily_price_keyboard() -> InlineKeyboardMarkup:
-
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -59,7 +58,7 @@ def daily_price_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="⬅️ Admin panel",
+                    text="↩️ Ortga",
                     callback_data="daily_price:back",
                 )
             ],
@@ -70,13 +69,10 @@ def daily_price_keyboard() -> InlineKeyboardMarkup:
 def vpn_accounts_keyboard(
     accounts,
 ) -> InlineKeyboardMarkup:
-
     buttons = []
 
     for account in accounts:
-
         user = account.user
-
         full_name = user.first_name
 
         if user.last_name:
@@ -115,11 +111,9 @@ def vpn_account_actions_keyboard(
     account_id: int,
     is_active: bool,
 ) -> InlineKeyboardMarkup:
-
     buttons = []
 
     if is_active:
-
         buttons.append(
             [
                 InlineKeyboardButton(
@@ -128,9 +122,7 @@ def vpn_account_actions_keyboard(
                 )
             ]
         )
-
     else:
-
         buttons.append(
             [
                 InlineKeyboardButton(
