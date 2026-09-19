@@ -5,7 +5,7 @@ import re
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from aiogram.types import (
@@ -24,6 +24,7 @@ from app.keyboards.admin import (
     vpn_accounts_keyboard,
 )
 from app.keyboards.menu import main_menu
+from app.models.daily_subscription import DailySubscription
 from app.models.promo import Promo
 from app.models.promo_redemption import PromoRedemption
 from app.models.user_bonus import UserBonus
@@ -153,6 +154,23 @@ async def process_daily_price(
         parse_mode="HTML",
         reply_markup=admin_menu,
     )
+
+
+@router.callback_query(F.data == "daily_price:back")
+async def daily_price_back(callback: CallbackQuery):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await _replace_callback_with_admin_panel(callback)
 
 
 async def _replace_callback_with_admin_panel(
@@ -2991,6 +3009,23 @@ async def search_admin_panel(
     await _replace_callback_with_admin_panel(callback)
 
 
+@router.callback_query(F.data == "admin_user_search_back")
+async def admin_user_search_back(callback: CallbackQuery):
+    admin = await get_admin(
+        telegram_id=callback.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await callback.answer(
+            "Ruxsat yo‘q.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await _replace_callback_with_admin_panel(callback)
+
+
 @router.callback_query(
     F.data.startswith("search_back:")
 )
@@ -3961,6 +3996,21 @@ async def statistics(message: Message):
 
         stats = await statistics_service.get_statistics()
 
+        daily_total = await session.scalar(
+            select(func.count())
+            .select_from(DailySubscription)
+        )
+        daily_active = await session.scalar(
+            select(func.count())
+            .select_from(DailySubscription)
+            .where(DailySubscription.status == "active")
+        )
+        daily_expired = await session.scalar(
+            select(func.count())
+            .select_from(DailySubscription)
+            .where(DailySubscription.status == "expired")
+        )
+
     protocol_lines = []
 
     for protocol, count in stats.protocol_counts.items():
@@ -3990,6 +4040,11 @@ async def statistics(message: Message):
         f"├ Faol: <b>{stats.active_subscriptions}</b>\n"
         f"└ Muddati tugagan: "
         f"<b>{stats.expired_subscriptions}</b>\n\n"
+
+        "📅 <b>DAILY OBUNALAR</b>\n"
+        f"├ Jami: <b>{daily_total or 0}</b>\n"
+        f"├ Faol: <b>{daily_active or 0}</b>\n"
+        f"└ Muddati tugagan: <b>{daily_expired or 0}</b>\n\n"
 
         "🔑 <b>VPN HISOBLAR</b>\n"
         f"├ Jami: <b>{stats.total_vpn_accounts}</b>\n"

@@ -7,6 +7,7 @@ from app.config.config import config
 from app.database.database import async_session
 from app.factories.marzban_factory import create_marzban_service
 from app.keyboards.subscription_keyboard import subscription_keyboard
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.service_access_service import ServiceAccessService
 from app.services.subscription_info_service import SubscriptionInfoService
 from app.services.user_service import UserService
@@ -92,29 +93,24 @@ def format_bonus_history(bonuses: list) -> str:
             bonus.status,
         )
 
-        lines.append(
-            f"• {name}"
-        )
+        lines.append(f"• {name}")
         lines.append(
             f"  ⏳ {bonus.duration_days} kun"
         )
 
-        if (
-            bonus.bonus_type.lower() == "welcome"
-            and getattr(bonus, "traffic", None) is not None
-        ):
-            traffic = bonus.traffic
-            limit_gb = (
-                traffic.traffic_limit_bytes
-                / (1024 ** 3)
-            )
-            lines.append(
-                f"  📦 {limit_gb:.0f} GB"
-            )
+        if bonus.bonus_type.lower() == "welcome":
+            traffic = getattr(bonus, "traffic", None)
 
-        lines.append(
-            f"  {status}"
-        )
+            if traffic is not None:
+                limit_gb = (
+                    traffic.traffic_limit_bytes
+                    / (1024 ** 3)
+                )
+                lines.append(
+                    f"  📦 {limit_gb:.0f} GB"
+                )
+
+        lines.append(f"  {status}")
 
     return "\n".join(lines)
 
@@ -123,53 +119,45 @@ def format_pending_bonus_summary(bonuses: list) -> str:
     if not bonuses:
         return ""
 
-    grouped: dict[str, list] = {}
+    lines = [
+        "⏭️ <b>KEYINGI XIZMAT</b>",
+        "",
+    ]
 
-    for bonus in bonuses:
-        bonus_type = bonus.bonus_type.lower()
+    ordered_types = ("welcome", "promo", "referral", "admin")
 
-        if bonus_type == "welcome":
-            continue
+    ordered_bonuses = []
 
-        grouped.setdefault(bonus_type, []).append(bonus)
-
-    if not grouped:
-        return ""
-
-    lines = ["🎁 <b>Kutilayotgan bonuslar</b>", ""]
-
-    for bonus_type in ("promo", "referral", "admin"):
-        items = grouped.get(bonus_type)
-
-        if not items:
-            continue
-
-        total_days = sum(
-            bonus.duration_days
-            for bonus in items
+    for bonus_type in ordered_types:
+        ordered_bonuses.extend(
+            bonus
+            for bonus in bonuses
+            if bonus.bonus_type.lower() == bonus_type
         )
 
+    ordered_bonuses.extend(
+        bonus
+        for bonus in bonuses
+        if bonus.bonus_type.lower()
+        not in ordered_types
+    )
+
+    for bonus in ordered_bonuses:
+        bonus_type = bonus.bonus_type.lower()
         name = get_bonus_name(bonus_type)
 
+        lines.append(f"• {name}")
         lines.append(
-            f"{name}: <b>{len(items)} ta = {total_days} kun</b>"
+            f"  ⏳ {bonus.duration_days} kun"
         )
 
-    for bonus_type, items in grouped.items():
-        if bonus_type in {"promo", "referral", "admin"}:
-            continue
+        if bonus_type == "welcome":
+            lines.append("  📦 3 GB")
 
-        total_days = sum(
-            bonus.duration_days
-            for bonus in items
-        )
+        lines.append("  ⏳ Kutilmoqda")
+        lines.append("")
 
-        lines.append(
-            f"{get_bonus_name(bonus_type)}: "
-            f"<b>{len(items)} ta = {total_days} kun</b>"
-        )
-
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 async def get_marzban_status(username: str) -> str | None:
@@ -349,7 +337,8 @@ async def my_subscription(message: Message):
             await message.answer(
                 "❌ Sizda hozircha xizmat yoki bonus mavjud emas.\n\n"
                 "🛒 Obuna sotib olish bo‘limidan "
-                "tarif tanlang yoki bonus oling."
+                "tarif tanlang yoki bonus oling.",
+                reply_markup=user_navigation_keyboard(),
             )
             return
 
@@ -458,7 +447,8 @@ async def create_vpn_for_subscription(
 
             await callback.message.edit_text(
                 "❌ VPN hisob yaratishda xatolik yuz berdi.\n\n"
-                "Iltimos, birozdan keyin qayta urinib ko‘ring."
+                "Iltimos, birozdan keyin qayta urinib ko‘ring.",
+                reply_markup=user_navigation_keyboard(),
             )
             return
 
@@ -466,7 +456,8 @@ async def create_vpn_for_subscription(
             await callback.message.edit_text(
                 "❌ Hozirda faol xizmat mavjud emas.\n\n"
                 "🛒 Yangi xizmat sotib oling yoki "
-                "bonus navbatini kuting."
+                "bonus navbatini kuting.",
+                reply_markup=user_navigation_keyboard(),
             )
             return
 

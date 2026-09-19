@@ -1,9 +1,11 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
+from app.keyboards.menu import main_menu
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.promo_service import PromoService
 from app.services.user_service import UserService
 
@@ -18,13 +20,49 @@ class PromoStates(StatesGroup):
 @router.message(F.text == "🎟 Promo kod")
 async def promo_start(message: Message, state: FSMContext):
     await state.set_state(PromoStates.waiting_for_code)
-
     await message.answer(
         "🎟 <b>PROMO KOD</b>\n\n"
         "Promo kodingizni yuboring.\n\n"
-        "Masalan: <code>WELCOME2026</code>\n\n"
-        "❌ Bekor qilish uchun <b>Bekor qilish</b> deb yozing.",
+        "Masalan: <code>WELCOME2026</code>",
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="promo_cancel",
+            close_callback="promo_cancel",
+        ),
+    )
+
+
+@router.callback_query(F.data == "promo_cancel")
+async def promo_cancel(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.clear()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.message.answer(
+        "❌ Promo kod kiritish bekor qilindi.\n\n"
+        "🏠 <b>ASOSIY MENYU</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu,
+    )
+
+
+@router.callback_query(F.data == "promo_back")
+async def promo_back(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.clear()
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.message.answer(
+        "🏠 <b>ASOSIY MENYU</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu,
     )
 
 
@@ -42,14 +80,14 @@ async def promo_redeem(message: Message, state: FSMContext):
     if code.casefold() in {"bekor qilish", "cancel", "/cancel"}:
         await state.clear()
         await message.answer(
-            "❌ Promo kod kiritish bekor qilindi."
+            "❌ Promo kod kiritish bekor qilindi.",
+            reply_markup=main_menu,
         )
         return
 
     async with async_session() as session:
         try:
             user_service = UserService(session)
-
             user = await user_service.get_by_telegram_id(
                 telegram_id=message.from_user.id
             )
@@ -58,41 +96,29 @@ async def promo_redeem(message: Message, state: FSMContext):
                 await session.rollback()
                 await state.clear()
                 await message.answer(
-                    "❌ Foydalanuvchi topilmadi. "
-                    "Avval /start buyrug‘ini yuboring."
+                    "❌ Foydalanuvchi topilmadi. Avval /start buyrug‘ini yuboring."
                 )
                 return
 
             promo_service = PromoService(session)
-
-            result = await promo_service.redeem(
-                user_id=user.id,
-                code=code,
-            )
+            result = await promo_service.redeem(user_id=user.id, code=code)
 
             if not result.success:
                 await session.rollback()
-                await message.answer(
-                    result.message,
-                    parse_mode="HTML",
-                )
+                await message.answer(result.message, parse_mode="HTML")
                 return
 
             await session.commit()
-
         except Exception:
             await session.rollback()
             raise
 
     await state.clear()
-
     bonus = result.bonus
     promo = result.promo
 
     if bonus is None or promo is None:
-        await message.answer(
-            "✅ Promo kod qabul qilindi."
-        )
+        await message.answer("✅ Promo kod qabul qilindi.", reply_markup=main_menu)
         return
 
     await message.answer(
@@ -102,4 +128,8 @@ async def promo_redeem(message: Message, state: FSMContext):
         "Bonus xizmat navbatiga qo‘shildi. "
         "Agar hozir faol xizmat bo‘lmasa, bonus darhol ishga tushadi.",
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="promo_back",
+            close_callback="promo_cancel",
+        ),
     )

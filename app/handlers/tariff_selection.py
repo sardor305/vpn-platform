@@ -2,6 +2,12 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.database.database import async_session
+from app.keyboards.user_navigation import (
+    append_navigation,
+    user_navigation_keyboard,
+)
+from app.keyboards.tariffs import tariffs_keyboard
+from app.services.plan_service import PlanService
 from app.services.purchase_service import PurchaseService
 from app.services.user_service import UserService
 
@@ -43,8 +49,12 @@ async def select_tariff(callback: CallbackQuery):
 
     if not result.success:
 
-        await callback.message.answer(
+        await callback.message.edit_text(
             result.message,
+            parse_mode="HTML",
+            reply_markup=user_navigation_keyboard(
+                back_callback="buy_plans",
+            ),
         )
 
         return
@@ -117,4 +127,38 @@ async def select_tariff(callback: CallbackQuery):
     await callback.message.edit_text(
         text,
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="buy_plans",
+        ),
+    )
+
+
+@router.callback_query(F.data == "tariff_back")
+async def tariff_back(callback: CallbackQuery):
+    await callback.answer()
+
+    async with async_session() as session:
+        plan_service = PlanService(session)
+        plans = await plan_service.get_all_active_plans()
+
+    if not plans:
+        await callback.message.edit_text(
+            "📦 <b>VPN TARIFLARI</b>\n\n"
+            "Hozircha faol tariflar mavjud emas.",
+            parse_mode="HTML",
+            reply_markup=user_navigation_keyboard(
+                back_callback="buy_back",
+            ),
+        )
+        return
+
+    await callback.message.edit_text(
+        "📦 <b>VPN TARIFLARI</b>\n\n"
+        "⬇️ Kerakli tarifni tanlang:",
+        parse_mode="HTML",
+        reply_markup=append_navigation(
+            tariffs_keyboard(plans),
+            back_callback="buy_back",
+            close_callback="user_close",
+        ),
     )

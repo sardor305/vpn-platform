@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
 from app.keyboards.buy import buy_menu_keyboard
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.purchase_service import PurchaseService
 from app.services.user_service import UserService
 from app.states.daily_subscription import DailySubscriptionStates
@@ -122,6 +123,9 @@ async def buy_daily_subscription(callback: CallbackQuery):
     await callback.message.edit_text(
         _format_daily_result(result),
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="buy_daily",
+        ),
     )
 
 
@@ -136,6 +140,9 @@ async def daily_custom(callback: CallbackQuery, state: FSMContext):
         "Necha kunlik VPN kerakligini yozing.\n\n"
         "Masalan: <b>10</b>",
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="buy_daily",
+        ),
     )
 
 
@@ -176,6 +183,9 @@ async def process_custom_days(message: Message, state: FSMContext):
     await message.answer(
         _format_daily_result(result),
         parse_mode="HTML",
+        reply_markup=user_navigation_keyboard(
+            back_callback="buy_daily",
+        ),
     )
 
 

@@ -1,26 +1,47 @@
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 def subscription_keyboard(
     subscription_url: str | None = None,
     show_create_vpn: bool = False,
 ) -> InlineKeyboardMarkup:
-
-    builder = InlineKeyboardBuilder()
+    rows = []
 
     if subscription_url:
-        builder.button(
-            text="📥 Subscription",
-            url=subscription_url,
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="📥 Subscription",
+                    url=subscription_url,
+                )
+            ]
         )
 
     if show_create_vpn:
-        builder.button(
-            text="🔑 Yangi VPN olish",
-            callback_data="subscription:create_vpn",
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔑 Yangi VPN olish",
+                    callback_data="subscription:create_vpn",
+                )
+            ]
         )
 
-    builder.adjust(1)
+    rows.extend(
+        [
+            [
+                InlineKeyboardButton(
+                    text="↩️ Ortga",
+                    callback_data="user_back",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Yopish",
+                    callback_data="user_close",
+                ),
+            ],
+        ]
+    )
 
-    return builder.as_markup()
+    return InlineKeyboardMarkup(inline_keyboard=rows)
