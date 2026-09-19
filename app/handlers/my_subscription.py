@@ -7,6 +7,7 @@ from app.config.config import config
 from app.database.database import async_session
 from app.factories.marzban_factory import create_marzban_service
 from app.keyboards.subscription_keyboard import subscription_keyboard
+from app.keyboards.menu import main_menu
 from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.service_access_service import ServiceAccessService
 from app.services.subscription_info_service import SubscriptionInfoService

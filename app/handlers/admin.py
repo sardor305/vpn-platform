@@ -58,6 +58,7 @@ router = Router()
 
 class AdminSearchStates(StatesGroup):
     waiting_for_user_id = State()
+    waiting_for_admin_bonus_user_id = State()
     waiting_for_custom_plan_days = State()
     waiting_for_custom_extend_days = State()
     waiting_for_daily_price = State()
@@ -828,6 +829,93 @@ async def admin_panel(message: Message):
     if user is None or not user.is_admin:
         return
     await send_admin_panel(message)
+
+
+@router.message(F.text == "🎁 Admin Bonus")
+async def admin_bonus_start(
+    message: Message,
+    state: FSMContext,
+):
+    admin = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        return
+
+    await state.clear()
+    await state.set_state(
+        AdminSearchStates.waiting_for_admin_bonus_user_id
+    )
+
+    await message.answer(
+        "🎁 <b>ADMIN BONUS</b>\n\n"
+        "Bonus beriladigan foydalanuvchining User ID "
+        "yoki Telegram ID raqamini yuboring.\n\n"
+        "Masalan:\n"
+        "<code>7</code>\n"
+        "yoki\n"
+        "<code>522599954</code>",
+        parse_mode="HTML",
+    )
+
+
+@router.message(
+    AdminSearchStates.waiting_for_admin_bonus_user_id
+)
+async def process_admin_bonus_user_id(
+    message: Message,
+    state: FSMContext,
+):
+    admin = await get_admin(
+        telegram_id=message.from_user.id
+    )
+
+    if admin is None or not admin.is_admin:
+        await state.clear()
+        return
+
+    search_value = (message.text or "").strip()
+
+    if not search_value.isdigit():
+        await message.answer(
+            "❌ <b>Noto‘g‘ri format.</b>\n\n"
+            "Iltimos, User ID yoki Telegram ID raqamini yuboring.",
+            parse_mode="HTML",
+        )
+        return
+
+    search_id = int(search_value)
+
+    async with async_session() as session:
+        user_service = UserService(session)
+        found_user = await user_service.get_by_id(
+            user_id=search_id
+        )
+
+        if found_user is None:
+            found_user = await user_service.get_by_telegram_id(
+                telegram_id=search_id
+            )
+
+    if found_user is None:
+        await message.answer(
+            "❌ <b>Foydalanuvchi topilmadi.</b>\n\n"
+            f"Qidirilgan raqam: <code>{search_id}</code>\n\n"
+            "Boshqa User ID yoki Telegram ID yuboring.",
+            parse_mode="HTML",
+        )
+        return
+
+    await state.clear()
+
+    await message.answer(
+        "🎁 <b>ADMIN BONUS BERISH</b>\n\n"
+        f"👤 User ID: <code>{found_user.id}</code>\n\n"
+        "Bonus muddatini tanlang:",
+        parse_mode="HTML",
+        reply_markup=admin_bonus_duration_keyboard(found_user.id),
+    )
 
 
 @router.message(F.text == "🔎 Qidiruv")
