@@ -123,11 +123,5 @@ def _plans_navigation_keyboard() -> InlineKeyboardMarkup:
                     callback_data="buy_back",
                 ),
             ],
-            [
-                InlineKeyboardButton(
-                    text="❌ Yopish",
-                    callback_data="user_close",
-                ),
-            ],
         ]
     )

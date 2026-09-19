@@ -518,6 +518,22 @@ async def my_subscription(message: Message):
         )
 
 
+@router.callback_query(F.data == "subscription_back")
+async def subscription_back(callback: CallbackQuery):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="🏠 <b>ASOSIY MENYU</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu,
+    )
+
+
 @router.callback_query(F.data == "subscription_history")
 async def subscription_history(
     callback: CallbackQuery,

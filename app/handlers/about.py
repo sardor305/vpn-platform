@@ -19,14 +19,13 @@ ABOUT_TEXT = (
 )
 
 
-@router.message(F.text == "ℹ Bot haqida")
+@router.message(F.text.in_({"ℹ Bot haqida", "ℹ️ Bot haqida"}))
 async def about_handler(message: Message):
     await message.answer(
         ABOUT_TEXT,
         parse_mode="HTML",
         reply_markup=user_navigation_keyboard(
             back_callback="about_back",
-            close_callback="user_close",
         ),
     )
 

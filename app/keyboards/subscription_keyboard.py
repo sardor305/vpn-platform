@@ -40,7 +40,7 @@ def subscription_keyboard(
         [
             InlineKeyboardButton(
                 text="↩️ Ortga",
-                callback_data="user_back",
+                callback_data="subscription_back",
             ),
         ]
     )

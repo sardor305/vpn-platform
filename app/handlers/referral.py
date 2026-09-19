@@ -75,7 +75,6 @@ async def referral_menu(message: Message):
         parse_mode="HTML",
         reply_markup=user_navigation_keyboard(
             back_callback="referral_back",
-            close_callback="referral_back",
         ),
     )
 

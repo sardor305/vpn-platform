@@ -35,7 +35,6 @@ async def guide_handler(message: Message):
         parse_mode="HTML",
         reply_markup=user_navigation_keyboard(
             back_callback="guide_back",
-            close_callback="user_close",
         ),
     )
 

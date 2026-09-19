@@ -22,6 +22,18 @@ async def help_handler(message: Message):
         )
 
     if user is None:
+        text = (
+            "📞 <b>Yordam</b>\n\n"
+            "Yordam bo‘limidan foydalanishingiz mumkin. "
+            "Agar muammo bo‘lsa, qo‘llab-quvvatlash xizmatiga murojaat qiling."
+        )
+        await message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=user_navigation_keyboard(
+                back_callback="help_back",
+            ),
+        )
         return
 
     if user.phone_number:
