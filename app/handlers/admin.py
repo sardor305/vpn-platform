@@ -3,6 +3,7 @@ from html import escape
 import re
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import func, select
@@ -661,6 +662,7 @@ async def show_vpn_account_detail(
 async def show_user_search_result(
     message: Message,
     user,
+    edit: bool = False,
 ):
     async with async_session() as session:
 
@@ -852,12 +854,22 @@ async def show_user_search_result(
             f"<code>{escape(subscription_url or '—')}</code>"
         )
 
+    keyboard = search_result_keyboard(
+        user_id=user.id,
+    )
+
+    if edit:
+        await message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+        return message
+
     return await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=search_result_keyboard(
-            user_id=user.id,
-        ),
+        reply_markup=keyboard,
     )
 
 
@@ -1045,10 +1057,35 @@ async def search_bonus_statistics(callback: CallbackQuery):
         service = BonusStatisticsService(session)
         stats = await service.get_user_statistics(user_id=user_id)
 
+        # Defensive fallback for deployments where the statistics service
+        # does not populate the Admin Bonus bucket yet.
+        admin_result = await session.execute(
+            select(UserBonus)
+            .where(
+                UserBonus.user_id == user_id,
+                UserBonus.bonus_type == "admin",
+            )
+        )
+        admin_bonuses = list(admin_result.scalars().all())
+
     welcome = stats.by_type.get("welcome", BonusTypeStats())
     promo = stats.by_type.get("promo", BonusTypeStats())
     referral = stats.by_type.get("referral", BonusTypeStats())
     admin_bonus = stats.by_type.get("admin", BonusTypeStats())
+
+    if admin_bonus.total == 0 and admin_bonuses:
+        admin_bonus = BonusTypeStats()
+        for bonus in admin_bonuses:
+            admin_bonus.total += 1
+            if bonus.status == "active":
+                admin_bonus.active += 1
+            elif bonus.status == "pending":
+                admin_bonus.pending += 1
+            elif bonus.status == "expired":
+                admin_bonus.expired += 1
+            elif bonus.status == "revoked":
+                admin_bonus.revoked += 1
+
     traffic = stats.welcome_traffic
     ref = stats.referral
     promo_stats = stats.promo
@@ -1237,11 +1274,15 @@ async def search_bonus_history(callback: CallbackQuery):
         text = "\n".join(lines).rstrip()
 
     await callback.answer()
-    await callback.message.edit_text(
-        text,
-        parse_mode="HTML",
-        reply_markup=bonus_user_statistics_keyboard(user_id),
-    )
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=bonus_user_statistics_keyboard(user_id),
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
 
 
 @router.callback_query(F.data.startswith("search_bonus_stats_back:"))
@@ -1269,6 +1310,7 @@ async def search_bonus_statistics_back(callback: CallbackQuery):
     await show_user_search_result(
         message=callback.message,
         user=user,
+        edit=True,
     )
 
 
@@ -3206,6 +3248,7 @@ async def search_back(
     await show_user_search_result(
         message=callback.message,
         user=user,
+        edit=True,
     )
 
 
@@ -3795,10 +3838,6 @@ async def search_subscription_history(
                 )
             )
 
-    start_number = (
-        (page - 1) * SUBSCRIPTION_HISTORY_PAGE_SIZE + 1
-    )
-
     items = []
 
     for offset, subscription in enumerate(
@@ -3806,7 +3845,14 @@ async def search_subscription_history(
     ):
         items.append(
             format_subscription_history_item(
-                index=start_number + offset,
+                index=(
+                    total
+                    - (
+                        (page - 1)
+                        * SUBSCRIPTION_HISTORY_PAGE_SIZE
+                        + offset
+                    )
+                ),
                 subscription=subscription,
             )
         )
