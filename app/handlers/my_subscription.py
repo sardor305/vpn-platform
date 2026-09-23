@@ -78,26 +78,22 @@ def format_queue_item(index: int, period) -> str:
 
 
 def format_bonus_history(bonuses: list) -> str:
-    if not bonuses:
+    expired_bonuses = [
+        bonus
+        for bonus in bonuses
+        if bonus.status == "expired"
+    ]
+
+    if not expired_bonuses:
         return ""
 
     lines = ["📜 <b>Bonuslar tarixi</b>", ""]
 
-    for bonus in bonuses:
+    for bonus in expired_bonuses:
         name = get_bonus_name(bonus.bonus_type)
-        status = {
-            "pending": "⏳ Kutilmoqda",
-            "active": "🟢 Faol",
-            "expired": "⚪ Tugagan",
-            "revoked": "🔴 Bekor qilingan",
-        }.get(
-            bonus.status,
-            bonus.status,
-        )
-
         lines.append(
             f"• {name} — <b>{bonus.duration_days} kun</b> "
-            f"({status})"
+            "(⚪ Tugagan)"
         )
 
     return "\n".join(lines)

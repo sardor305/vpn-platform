@@ -28,8 +28,8 @@ def admin_back_keyboard(
 async def delete_last_admin_message(
     message: Message,
 ) -> None:
-    telegram_id = message.from_user.id
-    message_id = _last_admin_message_ids.get(telegram_id)
+    chat_id = message.chat.id
+    message_id = _last_admin_message_ids.get(chat_id)
 
     if message_id is None:
         return
@@ -42,14 +42,14 @@ async def delete_last_admin_message(
     except Exception:
         pass
 
-    _last_admin_message_ids.pop(telegram_id, None)
+    _last_admin_message_ids.pop(chat_id, None)
 
 
 async def remember_admin_message(
     message: Message,
 ) -> None:
     _last_admin_message_ids[
-        message.from_user.id
+        message.chat.id
     ] = message.message_id
 
 
@@ -71,9 +71,9 @@ async def send_admin_panel(
 async def replace_with_admin_panel(
     message: Message,
 ) -> Message:
-    telegram_id = message.from_user.id
+    chat_id = message.chat.id
     current_id = _last_admin_message_ids.get(
-        telegram_id
+        chat_id
     )
 
     try:
@@ -87,7 +87,7 @@ async def replace_with_admin_panel(
     except Exception:
         pass
 
-    _last_admin_message_ids.pop(telegram_id, None)
+    _last_admin_message_ids.pop(chat_id, None)
 
     sent = await message.bot.send_message(
         chat_id=message.chat.id,

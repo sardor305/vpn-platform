@@ -68,7 +68,7 @@ async def admin_plans(
 
     if not plans:
 
-        await message.answer(
+        sent = await message.answer(
             "📦 <b>Tariflar</b>\n\n"
             f"💰 1 kunlik narx: "
             f"<b>{daily_price} RUB</b>\n\n"
@@ -76,6 +76,7 @@ async def admin_plans(
             parse_mode="HTML",
             reply_markup=admin_back_keyboard("admin_plan_back"),
         )
+        await remember_admin_message(sent)
 
         return
 
@@ -195,52 +196,23 @@ async def admin_plan_list(
     await callback.answer()
 
 
-@router.callback_query(
-    F.data == "admin_plan_create_back"
-)
-async def admin_plan_create_back(
-    callback: CallbackQuery,
-    state: FSMContext,
-):
+@router.callback_query(F.data == "admin_plan_input_back")
+async def admin_plan_input_back(callback: CallbackQuery, state: FSMContext):
     admin = await get_admin_user(callback)
-
     if admin is None:
-        await callback.answer(
-            "Ruxsat berilmagan.",
-            show_alert=True,
-        )
-        return
-
-    await state.clear()
-
+        await callback.answer("Ruxsat berilmagan.", show_alert=True); return
+    await state.clear(); await callback.answer()
+    await callback.message.delete()
     async with async_session() as session:
-        plan_service = PlanService(session)
-        plans = await plan_service.get_all_plans()
-
-        setting_service = SettingService(session)
-        daily_price = await setting_service.get_daily_price()
-
-    text = (
-        "📦 <b>Tariflar</b>\n\n"
-        f"💰 1 kunlik narx: <b>{daily_price} RUB</b>\n\n"
-    )
-
-    if plans:
-        text += "Kerakli tarifni tanlang:"
-    else:
-        text += "Hozircha tariflar mavjud emas."
-
-    await callback.message.edit_text(
-        text,
+        plan_service=PlanService(session); plans=await plan_service.get_all_plans()
+        setting_service=SettingService(session); daily_price=await setting_service.get_daily_price()
+    sent=await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text=("📦 <b>Tariflar</b>\n\n" f"💰 1 kunlik narx: <b>{daily_price} RUB</b>\n\n" + ("Kerakli tarifni tanlang:" if plans else "Hozircha tariflar mavjud emas.")),
         parse_mode="HTML",
-        reply_markup=(
-            admin_plans_keyboard(plans)
-            if plans
-            else admin_back_keyboard("admin_plan_back")
-        ),
+        reply_markup=(admin_plans_keyboard(plans) if plans else admin_back_keyboard("admin_plan_back")),
     )
-
-    await callback.answer()
+    await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -263,7 +235,8 @@ async def admin_plan_create(
         PlanStates.waiting_for_name
     )
 
-    await callback.message.answer(
+    await delete_last_admin_message(callback.message)
+    sent = await callback.message.answer(
         "➕ <b>Yangi tarif</b>\n\n"
         "1️⃣ Tarif nomini kiriting.\n\n"
         "Masalan:\n"
@@ -271,6 +244,7 @@ async def admin_plan_create(
         parse_mode="HTML",
         reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
     await callback.answer()
 
@@ -317,7 +291,8 @@ async def admin_plan_name(
         PlanStates.waiting_for_price
     )
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         f"📦 Tarif: <b>{escape(name)}</b>\n\n"
         "2️⃣ Tarif narxini kiriting.\n\n"
         "Faqat butun son kiriting.\n"
@@ -325,6 +300,7 @@ async def admin_plan_name(
         parse_mode="HTML",
         reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(
@@ -368,13 +344,15 @@ async def admin_plan_price(
         PlanStates.waiting_for_duration
     )
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         "3️⃣ Tarif amal qilish muddatini kiriting.\n\n"
         "Kunlarda, faqat butun son.\n"
         "Masalan: <code>30</code>",
         parse_mode="HTML",
         reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(
@@ -456,14 +434,17 @@ async def admin_plan_duration(
 
     await state.clear()
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         "✅ <b>Tarif muvaffaqiyatli yaratildi!</b>\n\n"
         f"📦 Nomi: <b>{escape(plan.name)}</b>\n"
         f"💰 Narxi: <b>{plan.price} ₽</b>\n"
         f"⏱ Muddat: <b>{plan.duration_days} kun</b>\n"
         "📊 Holat: <b>🟢 Faol</b>",
         parse_mode="HTML",
+        reply_markup=admin_back_keyboard("admin_plan_back"),
     )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -509,16 +490,16 @@ async def admin_plan_edit(
         PlanStates.waiting_for_edit_name
     )
 
-    await callback.message.answer(
+    await delete_last_admin_message(callback.message)
+    sent = await callback.message.answer(
         f"✏️ <b>Tarifni tahrirlash</b>\n\n"
-        f"📦 Hozirgi nomi: "
-        f"<b>{escape(plan.name)}</b>\n\n"
+        f"📦 Hozirgi nomi: <b>{escape(plan.name)}</b>\n\n"
         "Yangi nomni kiriting.\n\n"
-        "Agar nomni o'zgartirmoqchi bo'lmasangiz, "
-        "hozirgi nomini qayta kiriting.\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Agar nomni o'zgartirmoqchi bo'lmasangiz, hozirgi nomini qayta kiriting.",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
     await callback.answer()
 
@@ -594,13 +575,15 @@ async def admin_plan_edit_name(
         PlanStates.waiting_for_edit_price
     )
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         f"📦 Yangi nom: <b>{escape(name)}</b>\n\n"
         "💰 Yangi narxni kiriting.\n\n"
-        "Masalan: <code>300</code>\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Masalan: <code>300</code>",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(
@@ -644,13 +627,15 @@ async def admin_plan_edit_price(
         PlanStates.waiting_for_edit_duration
     )
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         "⏱ Yangi muddatni kiriting.\n\n"
         "Kunlarda, faqat butun son.\n"
-        "Masalan: <code>30</code>\n\n"
-        "❌ Bekor qilish uchun /cancel yozing.",
+        "Masalan: <code>30</code>",
         parse_mode="HTML",
+        reply_markup=admin_plan_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.message(
@@ -758,14 +743,17 @@ async def admin_plan_edit_duration(
         else "🔴 Faol emas"
     )
 
-    await message.answer(
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         "✅ <b>Tarif muvaffaqiyatli yangilandi!</b>\n\n"
         f"📦 Nomi: <b>{escape(plan.name)}</b>\n"
         f"💰 Narxi: <b>{plan.price} ₽</b>\n"
         f"⏱ Muddat: <b>{plan.duration_days} kun</b>\n"
         f"📊 Holat: <b>{status}</b>",
         parse_mode="HTML",
+        reply_markup=admin_back_keyboard("admin_plan_back"),
     )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(

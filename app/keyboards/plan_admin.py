@@ -98,12 +98,11 @@ def admin_plan_input_keyboard() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="↩️ Ortga",
-                    callback_data="admin_plan_create_back",
+                    callback_data="admin_plan_input_back",
                 )
             ]
         ]
     )
-
 
 def daily_price_input_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(

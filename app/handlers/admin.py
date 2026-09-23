@@ -25,6 +25,7 @@ from app.keyboards.admin import (
 )
 from app.keyboards.plan_admin import (
     admin_plans_keyboard,
+    daily_price_input_keyboard,
 )
 from app.keyboards.menu import main_menu
 from app.models.daily_subscription import DailySubscription
@@ -93,7 +94,9 @@ async def daily_price_change(
         AdminSearchStates.waiting_for_daily_price
     )
 
-    await callback.message.answer(
+    await delete_last_admin_message(callback.message)
+
+    sent = await callback.message.answer(
         "✏️ <b>KUNLIK NARXNI O‘ZGARTIRISH</b>\n\n"
         "1 kunlik narxni rublda kiriting.\n\n"
         "Masalan:\n"
@@ -101,7 +104,9 @@ async def daily_price_change(
         "<code>15</code>\n"
         "<code>20</code>",
         parse_mode="HTML",
+        reply_markup=daily_price_input_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -156,6 +161,32 @@ async def daily_price_back(
     await callback.answer()
 
 
+@router.callback_query(F.data == "daily_price:input_back")
+async def daily_price_input_back(callback: CallbackQuery, state: FSMContext):
+    admin = await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    await delete_last_admin_message(callback.message)
+    async with async_session() as session:
+        plan_service = PlanService(session)
+        plans = await plan_service.get_all_plans()
+        setting_service = SettingService(session=session)
+        daily_price = await setting_service.get_daily_price()
+    text = (
+        "📦 <b>Tariflar</b>\n\n"
+        f"💰 1 kunlik narx: <b>{daily_price} RUB</b>\n\n"
+        + ("Kerakli tarifni tanlang:" if plans else "Hozircha tariflar mavjud emas.")
+    )
+    sent = await callback.message.answer(
+        text, parse_mode="HTML",
+        reply_markup=(admin_plans_keyboard(plans) if plans else admin_back_keyboard("admin_plan_back")),
+    )
+    await remember_admin_message(sent)
+
+
 @router.message(
     AdminSearchStates.waiting_for_daily_price
 )
@@ -204,12 +235,21 @@ async def process_daily_price(
         await session.commit()
 
     await state.clear()
-
-    await message.answer(
-        f"✅ 1 kunlik narx: <b>{daily_price} RUB</b>",
+    await delete_last_admin_message(message)
+    async with async_session() as session:
+        plan_service = PlanService(session)
+        plans = await plan_service.get_all_plans()
+        setting_service = SettingService(session=session)
+        current_daily_price = await setting_service.get_daily_price()
+    sent = await message.answer(
+        "📦 <b>Tariflar</b>\n\n"
+        f"💰 1 kunlik narx: <b>{current_daily_price} RUB</b>\n\n"
+        "✅ Kunlik narx muvaffaqiyatli o‘zgartirildi.\n\n"
+        + ("Kerakli tarifni tanlang:" if plans else "Hozircha tariflar mavjud emas."),
         parse_mode="HTML",
-        reply_markup=admin_menu,
+        reply_markup=(admin_plans_keyboard(plans) if plans else admin_back_keyboard("admin_plan_back")),
     )
+    await remember_admin_message(sent)
 
 
 async def _replace_callback_with_admin_panel(
@@ -832,90 +872,45 @@ async def admin_panel(message: Message):
 
 
 @router.message(F.text == "🎁 Admin Bonus")
-async def admin_bonus_start(
-    message: Message,
-    state: FSMContext,
-):
-    admin = await get_admin(
-        telegram_id=message.from_user.id
-    )
-
+async def admin_bonus_start(message: Message, state: FSMContext):
+    admin = await get_admin(telegram_id=message.from_user.id)
     if admin is None or not admin.is_admin:
         return
-
     await state.clear()
-    await state.set_state(
-        AdminSearchStates.waiting_for_admin_bonus_user_id
-    )
-
-    await message.answer(
+    await state.set_state(AdminSearchStates.waiting_for_admin_bonus_user_id)
+    await delete_last_admin_message(message)
+    sent = await message.answer(
         "🎁 <b>ADMIN BONUS</b>\n\n"
-        "Bonus beriladigan foydalanuvchining User ID "
-        "yoki Telegram ID raqamini yuboring.\n\n"
-        "Masalan:\n"
-        "<code>7</code>\n"
-        "yoki\n"
-        "<code>522599954</code>",
+        "Bonus beriladigan foydalanuvchining User ID yoki Telegram ID raqamini yuboring.\n\n"
+        "Masalan:\n<code>7</code>\nyoki\n<code>522599954</code>",
         parse_mode="HTML",
+        reply_markup=admin_bonus_start_keyboard(),
     )
+    await remember_admin_message(sent)
 
 
-@router.message(
-    AdminSearchStates.waiting_for_admin_bonus_user_id
-)
-async def process_admin_bonus_user_id(
-    message: Message,
-    state: FSMContext,
-):
-    admin = await get_admin(
-        telegram_id=message.from_user.id
-    )
-
+@router.message(AdminSearchStates.waiting_for_admin_bonus_user_id)
+async def process_admin_bonus_user_id(message: Message, state: FSMContext):
+    admin = await get_admin(telegram_id=message.from_user.id)
     if admin is None or not admin.is_admin:
-        await state.clear()
+        await state.clear(); return
+    value=(message.text or "").strip()
+    if not value.isdigit():
+        await message.answer("❌ <b>Noto‘g‘ri format.</b>\n\nIltimos, User ID yoki Telegram ID raqamini yuboring.", parse_mode="HTML")
         return
-
-    search_value = (message.text or "").strip()
-
-    if not search_value.isdigit():
-        await message.answer(
-            "❌ <b>Noto‘g‘ri format.</b>\n\n"
-            "Iltimos, User ID yoki Telegram ID raqamini yuboring.",
-            parse_mode="HTML",
-        )
-        return
-
-    search_id = int(search_value)
-
+    search_id=int(value)
     async with async_session() as session:
-        user_service = UserService(session)
-        found_user = await user_service.get_by_id(
-            user_id=search_id
-        )
-
-        if found_user is None:
-            found_user = await user_service.get_by_telegram_id(
-                telegram_id=search_id
-            )
-
-    if found_user is None:
-        await message.answer(
-            "❌ <b>Foydalanuvchi topilmadi.</b>\n\n"
-            f"Qidirilgan raqam: <code>{search_id}</code>\n\n"
-            "Boshqa User ID yoki Telegram ID yuboring.",
-            parse_mode="HTML",
-        )
+        us=UserService(session)
+        found=await us.get_by_id(user_id=search_id)
+        if found is None:
+            found=await us.get_by_telegram_id(telegram_id=search_id)
+    if found is None:
+        await message.answer(f"❌ <b>Foydalanuvchi topilmadi.</b>\n\nQidirilgan raqam: <code>{search_id}</code>", parse_mode="HTML")
         return
-
     await state.clear()
-
-    await message.answer(
-        "🎁 <b>ADMIN BONUS BERISH</b>\n\n"
-        f"👤 User ID: <code>{found_user.id}</code>\n\n"
-        "Bonus muddatini tanlang:",
-        parse_mode="HTML",
-        reply_markup=admin_bonus_duration_keyboard(found_user.id),
-    )
+    await delete_last_admin_message(message)
+    sent=await message.answer("🎁 <b>ADMIN BONUS BERISH</b>\n\n" f"👤 User ID: <code>{found.id}</code>\n\nBonus muddatini tanlang:", parse_mode="HTML", reply_markup=admin_bonus_duration_keyboard(found.id))
+    await remember_admin_message(sent)
 
 
 @router.message(F.text == "🔎 Qidiruv")
@@ -1614,6 +1609,31 @@ async def search_plan_cancel(
 # ============================================================
 
 
+def admin_bonus_start_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="↩️ Ortga", callback_data="admin_bonus:back")]])
+
+def admin_bonus_reason_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="↩️ Ortga", callback_data="admin_bonus:reason_back")]])
+
+@router.callback_query(F.data == "admin_bonus:back")
+async def admin_bonus_back(callback: CallbackQuery, state: FSMContext):
+    admin=await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True); return
+    await state.clear(); await callback.answer(); await replace_with_admin_panel(callback.message)
+
+@router.callback_query(F.data == "admin_bonus:reason_back")
+async def admin_bonus_reason_back(callback: CallbackQuery, state: FSMContext):
+    admin=await get_admin(telegram_id=callback.from_user.id)
+    if admin is None or not admin.is_admin:
+        await callback.answer("Ruxsat yo‘q.", show_alert=True); return
+    data=await state.get_data(); user_id=data.get("admin_bonus_user_id")
+    await state.clear(); await callback.answer()
+    if user_id is None:
+        await replace_with_admin_panel(callback.message); return
+    await callback.message.edit_text("🎁 <b>ADMIN BONUS BERISH</b>\n\n" f"👤 User ID: <code>{user_id}</code>\n\nBonus muddatini tanlang:", parse_mode="HTML", reply_markup=admin_bonus_duration_keyboard(user_id))
+
+
 def admin_bonus_duration_keyboard(
     user_id: int,
 ) -> InlineKeyboardMarkup:
@@ -1648,7 +1668,7 @@ def admin_bonus_duration_keyboard(
             [
                 InlineKeyboardButton(
                     text="↩️ Bekor qilish",
-                    callback_data=f"search_back:{user_id}",
+                    callback_data="admin_bonus:back",
                 ),
             ],
         ]
@@ -1693,14 +1713,15 @@ async def _ask_admin_bonus_reason(
     if isinstance(callback_or_message, CallbackQuery):
         await callback_or_message.answer()
         await callback_or_message.message.edit_text(
-            text,
-            parse_mode="HTML",
+            text, parse_mode="HTML",
+            reply_markup=admin_bonus_reason_keyboard(),
         )
     else:
-        await callback_or_message.answer(
-            text,
-            parse_mode="HTML",
+        sent = await callback_or_message.answer(
+            text, parse_mode="HTML",
+            reply_markup=admin_bonus_reason_keyboard(),
         )
+        await remember_admin_message(sent)
 
 
 @router.callback_query(
@@ -1776,6 +1797,7 @@ async def admin_bonus_custom(
         "Faqat musbat butun son.\n\n"
         "Masalan: <code>14</code>, <code>60</code>",
         parse_mode="HTML",
+        reply_markup=admin_bonus_start_keyboard(),
     )
 
 
@@ -1804,6 +1826,7 @@ async def process_admin_bonus_days(
         await state.clear()
         await message.answer("❌ Admin Bonus sessiyasi topilmadi.", reply_markup=admin_menu)
         return
+    await delete_last_admin_message(message)
     await _ask_admin_bonus_reason(message, state, user_id, int(value))
 
 
@@ -1857,8 +1880,9 @@ async def process_admin_bonus_reason(
             return
 
     await state.clear()
+    await delete_last_admin_message(message)
     number = bonus.bonus_number
-    await message.answer(
+    sent = await message.answer(
         "✅ <b>ADMIN BONUS BERILDI</b>\n\n"
         f"👤 User ID: <code>{user_id}</code>\n"
         f"🎁 Admin Bonus <b>#{number}</b>\n"
@@ -1869,6 +1893,7 @@ async def process_admin_bonus_reason(
         parse_mode="HTML",
         reply_markup=admin_bonus_result_keyboard(user_id),
     )
+    await remember_admin_message(sent)
 
 def subscription_extend_keyboard(
     user_id: int,
