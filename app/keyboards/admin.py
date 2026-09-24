@@ -21,6 +21,7 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🔎 Qidiruv"),
         ],
         [
+            KeyboardButton(text="🎁 Bonuslar"),
             KeyboardButton(text="🎁 Admin Bonus"),
         ],
         [
@@ -58,7 +59,7 @@ def daily_price_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="↩️ Ortga",
+                    text="⬅️ Admin panel",
                     callback_data="daily_price:back",
                 )
             ],
