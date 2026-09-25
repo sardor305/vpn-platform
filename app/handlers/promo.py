@@ -37,15 +37,17 @@ async def promo_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
     try:
-        await callback.message.delete()
+        await callback.message.edit_text(
+            "🏠 <b>ASOSIY MENYU</b>",
+            parse_mode="HTML",
+            reply_markup=main_menu,
+        )
     except Exception:
-        pass
-
-    await callback.message.answer(
-        "🏠 <b>ASOSIY MENYU</b>",
-        parse_mode="HTML",
-        reply_markup=main_menu,
-    )
+        await callback.message.answer(
+            "🏠 <b>ASOSIY MENYU</b>",
+            parse_mode="HTML",
+            reply_markup=main_menu,
+        )
 
 
 @router.message(PromoStates.waiting_for_code)
