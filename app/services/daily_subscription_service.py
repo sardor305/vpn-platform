@@ -42,6 +42,15 @@ class DailySubscriptionService:
             .get_pending_by_user(user_id)
         )
 
+    async def get_subscription_history(
+        self,
+        user_id: int,
+    ) -> list[DailySubscription]:
+        return await (
+            self.daily_subscription_repository
+            .get_all_by_user(user_id)
+        )
+
     async def get_all_pending_subscriptions(
         self,
     ) -> list[DailySubscription]:

@@ -77,6 +77,20 @@ class DailySubscriptionRepository:
 
         return list(result.scalars().all())
 
+    async def get_all_by_user(
+        self,
+        user_id: int,
+    ) -> list[DailySubscription]:
+        """Return all Daily subscriptions for one user, newest first."""
+        stmt = (
+            select(DailySubscription)
+            .where(DailySubscription.user_id == user_id)
+            .order_by(DailySubscription.id.desc())
+        )
+
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_all_pending(
         self,
     ) -> list[DailySubscription]:

@@ -26,6 +26,9 @@ from app.handlers.daily_subscription import (
 from app.handlers.my_subscription import (
     router as my_subscription_router,
 )
+from app.handlers.my_bonuses import (
+    router as my_bonuses_router,
+)
 from app.handlers.admin import router as admin_router
 from app.handlers.plan_admin import (
     router as plan_admin_router,
@@ -58,6 +61,7 @@ dp.include_router(user_navigation_router)
 dp.include_router(tariff_selection_router)
 dp.include_router(daily_subscription_router)
 dp.include_router(my_subscription_router)
+dp.include_router(my_bonuses_router)
 dp.include_router(admin_router)
 dp.include_router(plan_admin_router)
 

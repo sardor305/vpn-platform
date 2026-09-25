@@ -39,8 +39,8 @@ def subscription_keyboard(
     rows.append(
         [
             InlineKeyboardButton(
-                text="↩️ Ortga",
-                callback_data="subscription_back",
+                text="🏠 Asosiy menyu",
+                callback_data="user_main_menu",
             ),
         ]
     )
