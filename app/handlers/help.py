@@ -62,11 +62,11 @@ def help_text(has_phone: bool) -> str:
         )
     return (
         "📞 <b>Yordam</b>\n\n"
-        "Telefon raqamingiz hali akkauntingizga ulanmagan.\n\n"
-        "📱 Telefon raqamingizni ulash uchun pastdagi "
-        "<b>Telefon raqamini ulashish</b> tugmasini bosing.\n\n"
-        "Keyin Telegram ko‘rsatgan <b>Telefon raqamini yuborish</b> tugmasini bosing.\n\n"
-        "🔒 Raqamingiz boshqa foydalanuvchilarga ko‘rsatilmaydi."
+        "Savolingiz yoki muammoingiz bo‘lsa, biz bilan bog‘lanishingiz mumkin.\n\n"
+        "🛠 Obuna, to‘lov, VPN xizmati yoki botdan foydalanish bo‘yicha "
+        "yordam olish uchun <b>Telefon raqamingizni ulashish</b> tugmasini bosing.\n\n"
+        "🔒 Telefon raqamingiz faqat murojaatingizni aniqlash uchun ishlatiladi "
+        "va boshqa foydalanuvchilarga ko‘rsatilmaydi."
     )
 
 
