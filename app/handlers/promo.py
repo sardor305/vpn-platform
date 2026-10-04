@@ -25,27 +25,7 @@ async def promo_start(message: Message, state: FSMContext):
         "Promo kodingizni yuboring.\n\n"
         "Masalan: <code>WELCOME2026</code>",
         parse_mode="HTML",
-        reply_markup=user_navigation_keyboard(
-            back_callback="promo_back",
-        ),
-    )
-
-
-@router.callback_query(F.data == "promo_back")
-async def promo_back(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
-    await state.clear()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.bot.send_message(
-        chat_id=callback.message.chat.id,
-        text="🏠 <b>ASOSIY MENYU</b>",
-        parse_mode="HTML",
-        reply_markup=main_menu,
+        reply_markup=user_navigation_keyboard(),
     )
 
 
@@ -111,7 +91,5 @@ async def promo_redeem(message: Message, state: FSMContext):
         "Bonus xizmat navbatiga qo‘shildi. "
         "Agar hozir faol xizmat bo‘lmasa, bonus darhol ishga tushadi.",
         parse_mode="HTML",
-        reply_markup=user_navigation_keyboard(
-            back_callback="promo_back",
-        ),
+        reply_markup=user_navigation_keyboard(),
     )

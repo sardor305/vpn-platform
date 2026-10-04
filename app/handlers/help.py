@@ -47,7 +47,7 @@ def phone_share_keyboard() -> ReplyKeyboardMarkup:
                 )
             ],
             [
-                KeyboardButton(text="↩️ Yordamga qaytish"),
+                KeyboardButton(text="↩ Ortga"),
             ],
         ],
         resize_keyboard=True,
@@ -122,7 +122,7 @@ async def help_phone(callback: CallbackQuery):
     )
 
 
-@router.message(F.text == "↩️ Yordamga qaytish")
+@router.message(F.text == "↩ Ortga")
 async def help_phone_cancel(message: Message):
     async with async_session() as session:
         user_service = UserService(session)
@@ -130,6 +130,13 @@ async def help_phone_cancel(message: Message):
             telegram_id=message.from_user.id
         )
 
+    # Remove the temporary reply keyboard first, then show the Help screen
+    # again with its normal inline navigation.
+    await message.answer(
+        "↩ <b>Yordamga qaytildi</b>",
+        parse_mode="HTML",
+        reply_markup=ReplyKeyboardRemove(),
+    )
     await message.answer(
         help_text(bool(user and user.phone_number)),
         parse_mode="HTML",

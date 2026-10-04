@@ -3,7 +3,7 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 landing_menu = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="ℹ️ Bot haqida")],
+        [KeyboardButton(text="ℹ️ ZevintorTunnel haqida")],
         [KeyboardButton(text="📖 Foydalanish qo'llanmasi")],
         [KeyboardButton(text="🎁 Bonusni olish")],
     ],
@@ -19,7 +19,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="👥 Do‘stlarni taklif qilish")],
         [KeyboardButton(text="🎟 Promo kod")],
         [KeyboardButton(text="📞 Yordam")],
-        [KeyboardButton(text="ℹ️ Bot haqida")],
+        [KeyboardButton(text="ℹ️ ZevintorTunnel haqida")],
         [KeyboardButton(text="📖 Foydalanish qo'llanmasi")],
     ],
     resize_keyboard=True,
@@ -34,7 +34,7 @@ main_menu_with_welcome = ReplyKeyboardMarkup(
         [KeyboardButton(text="👥 Do‘stlarni taklif qilish")],
         [KeyboardButton(text="🎟 Promo kod")],
         [KeyboardButton(text="📞 Yordam")],
-        [KeyboardButton(text="ℹ️ Bot haqida")],
+        [KeyboardButton(text="ℹ️ ZevintorTunnel haqida")],
         [KeyboardButton(text="📖 Foydalanish qo'llanmasi")],
         [KeyboardButton(text="🎁 Bonusni olish")],
     ],
