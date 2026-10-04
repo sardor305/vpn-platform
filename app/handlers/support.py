@@ -47,8 +47,15 @@ async def support_back(
 ):
     await state.clear()
     await callback.answer()
-    await callback.message.edit_text(
-        "🏠 <b>ASOSIY MENYU</b>",
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="🏠 <b>ASOSIY MENYU</b>",
         parse_mode="HTML",
         reply_markup=main_menu,
     )

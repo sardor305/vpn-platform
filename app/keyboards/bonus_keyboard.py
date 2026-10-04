@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.keyboards.user_navigation import user_navigation_keyboard
+
 
 def bonus_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -21,17 +23,6 @@ def bonus_keyboard() -> InlineKeyboardMarkup:
 
 
 def bonus_history_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="↩️ Orqaga",
-                    callback_data="bonus_history_back",
-                ),
-                InlineKeyboardButton(
-                    text="🏠 Asosiy menyu",
-                    callback_data="user_main_menu",
-                ),
-            ]
-        ]
+    return user_navigation_keyboard(
+        back_callback="bonus_history_back",
     )

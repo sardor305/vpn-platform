@@ -136,20 +136,3 @@ async def help_phone_cancel(message: Message):
         reply_markup=help_inline_keyboard(bool(user and user.phone_number)),
     )
 
-
-@router.callback_query(F.data == "help_back")
-async def help_back(callback: CallbackQuery):
-    await callback.answer()
-    await callback.message.edit_text(
-        "🏠 <b>ASOSIY MENYU</b>",
-        parse_mode="HTML",
-        reply_markup=main_menu,
-    )
-
-
-@router.message(F.text == "⬅️ Asosiy menyu")
-async def back_to_main_menu(message: Message):
-    await message.answer(
-        "🏠 Asosiy menyu",
-        reply_markup=main_menu,
-    )

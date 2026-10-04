@@ -3,7 +3,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
-from app.keyboards.buy import buy_menu_keyboard
 from app.keyboards.user_navigation import user_navigation_keyboard
 from app.services.purchase_service import PurchaseService
 from app.services.user_service import UserService
@@ -186,18 +185,4 @@ async def process_custom_days(message: Message, state: FSMContext):
         reply_markup=user_navigation_keyboard(
             back_callback="buy_daily",
         ),
-    )
-
-
-@router.callback_query(F.data == "buy_back")
-async def buy_back(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
-
-    await state.clear()
-
-    await callback.message.edit_text(
-        "🛒 <b>OBUNA SOTIB OLISH</b>\n\n"
-        "Kerakli obuna turini tanlang:",
-        parse_mode="HTML",
-        reply_markup=buy_menu_keyboard(),
     )
