@@ -11,6 +11,7 @@ from aiogram.types import (
 
 from app.database.database import async_session
 from app.keyboards.menu import main_menu
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.keyboards.support_admin import (
     ticket_keyboard,
 )
@@ -34,16 +35,8 @@ router = Router()
 
 
 def support_back_keyboard() -> InlineKeyboardMarkup:
-    """Return the single back button used by support screens."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="↩️ Ortga",
-                    callback_data="support_back",
-                )
-            ]
-        ]
+    return user_navigation_keyboard(
+        back_callback="support_back",
     )
 
 
@@ -54,20 +47,11 @@ async def support_back(
 ):
     await state.clear()
     await callback.answer()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.bot.send_message(
-        chat_id=callback.message.chat.id,
-        text="🏠 <b>ASOSIY MENYU</b>",
+    await callback.message.edit_text(
+        "🏠 <b>ASOSIY MENYU</b>",
         parse_mode="HTML",
         reply_markup=main_menu,
     )
-
-
 
 
 @router.message(F.text == "💬 Qo'llab-quvvatlash")
@@ -354,20 +338,23 @@ async def view_user_ticket(
         reply_markup = None
 
     if reply_markup is None:
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[]
-        )
+        reply_markup = InlineKeyboardMarkup(inline_keyboard=[])
 
     reply_markup.inline_keyboard.append(
         [
             InlineKeyboardButton(
                 text="↩️ Ortga",
                 callback_data="support_back",
-            )
+            ),
+            InlineKeyboardButton(
+                text="🏠 Asosiy menyu",
+                callback_data="user_main_menu",
+            ),
         ]
     )
 
-    await callback.message.answer(
+    # Keep support navigation inside the same Telegram message.
+    await callback.message.edit_text(
         text,
         parse_mode="HTML",
         reply_markup=reply_markup,
@@ -440,7 +427,7 @@ async def start_user_ticket_reply(
         ticket_id=ticket_id
     )
 
-    await callback.message.answer(
+    await callback.message.edit_text(
         f"✍️ <b>Murojaat #{ticket_id}</b>\n\n"
         "Javobingizni yozing.",
         parse_mode="HTML",
@@ -461,7 +448,7 @@ async def start_new_ticket(
         SupportStates.waiting_for_message
     )
 
-    await callback.message.answer(
+    await callback.message.edit_text(
         "✍️ <b>Yangi murojaat</b>\n\n"
         "Muammoingiz yoki savolingizni yozing.",
         parse_mode="HTML",

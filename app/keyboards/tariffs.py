@@ -17,12 +17,6 @@ def tariffs_keyboard(
             )
         ])
 
-    buttons.append([
-        InlineKeyboardButton(
-            text="⬅️ Orqaga",
-            callback_data="buy_back",
-        )
-    ])
 
     return InlineKeyboardMarkup(
         inline_keyboard=buttons,

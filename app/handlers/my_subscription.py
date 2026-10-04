@@ -424,7 +424,7 @@ async def create_vpn_for_subscription(callback: CallbackQuery):
                 "❌ VPN hisob yaratishda xatolik yuz berdi.\n\n"
                 "Iltimos, birozdan keyin qayta urinib ko‘ring.",
                 reply_markup=user_navigation_keyboard(
-                    home_callback="user_main_menu"
+                    back_callback="subscription_back",
                 ),
             )
             return
@@ -434,7 +434,7 @@ async def create_vpn_for_subscription(callback: CallbackQuery):
                 "❌ Hozirda faol xizmat mavjud emas.\n\n"
                 "🛒 Yangi xizmat sotib oling yoki navbatdagi xizmatni kuting.",
                 reply_markup=user_navigation_keyboard(
-                    home_callback="user_main_menu"
+                    back_callback="subscription_back",
                 ),
             )
             return

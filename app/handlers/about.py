@@ -1,5 +1,5 @@
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 
 from app.keyboards.menu import main_menu
 from app.keyboards.user_navigation import user_navigation_keyboard
@@ -24,24 +24,5 @@ async def about_handler(message: Message):
     await message.answer(
         ABOUT_TEXT,
         parse_mode="HTML",
-        reply_markup=user_navigation_keyboard(
-            back_callback="about_back",
-        ),
-    )
-
-
-@router.callback_query(F.data == "about_back")
-async def about_back(callback: CallbackQuery):
-    await callback.answer()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.bot.send_message(
-        chat_id=callback.message.chat.id,
-        text="🏠 <b>ASOSIY MENYU</b>",
-        parse_mode="HTML",
-        reply_markup=main_menu,
+        reply_markup=user_navigation_keyboard(),
     )

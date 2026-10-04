@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -24,7 +25,7 @@ async def buy_subscription(message: Message):
         "🛒 <b>OBUNA SOTIB OLISH</b>\n\n"
         "Kerakli obuna turini tanlang:",
         parse_mode="HTML",
-        reply_markup=_buy_menu_with_back_keyboard(),
+        reply_markup=_buy_menu_keyboard(),
     )
 
 
@@ -57,8 +58,9 @@ async def buy_plans(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "buy_daily")
-async def buy_daily(callback: CallbackQuery):
+async def buy_daily(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    await state.clear()
 
     async with async_session() as session:
         setting_service = SettingService(session)
@@ -79,28 +81,22 @@ async def buy_daily(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "buy_back")
-async def buy_back(callback: CallbackQuery):
+async def buy_back(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    await state.clear()
     await callback.message.edit_text(
         "🛒 <b>OBUNA SOTIB OLISH</b>\n\n"
         "Kerakli obuna turini tanlang:",
         parse_mode="HTML",
-        reply_markup=_buy_menu_with_back_keyboard(),
+        reply_markup=_buy_menu_keyboard(),
     )
 
 
-def _buy_menu_with_back_keyboard() -> InlineKeyboardMarkup:
-    keyboard = buy_menu_keyboard()
-    rows = [list(row) for row in keyboard.inline_keyboard]
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text="↩️ Ortga",
-                callback_data="user_back",
-            )
-        ]
+def _buy_menu_keyboard() -> InlineKeyboardMarkup:
+    return append_navigation(
+        buy_menu_keyboard(),
+        back_callback=None,
     )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _with_navigation(
@@ -115,13 +111,7 @@ def _with_navigation(
 
 
 def _plans_navigation_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="↩️ Ortga",
-                    callback_data="buy_back",
-                ),
-            ],
-        ]
+    return append_navigation(
+        InlineKeyboardMarkup(inline_keyboard=[]),
+        back_callback="buy_back",
     )

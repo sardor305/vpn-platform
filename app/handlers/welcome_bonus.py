@@ -3,6 +3,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.database.database import async_session
 from app.keyboards.menu import main_menu, main_menu_with_welcome
+from app.keyboards.user_navigation import user_navigation_keyboard
 from app.keyboards.welcome_bonus import (
     welcome_bonus_confirm_keyboard,
 )
@@ -98,11 +99,7 @@ async def welcome_bonus_cancel(
         "Istasangiz, keyinroq yana <b>🎁 Bonusni olish</b> "
         "tugmasi orqali urinib ko‘rishingiz mumkin.",
         parse_mode="HTML",
-    )
-
-    await callback.message.answer(
-        "🏠 Asosiy menyu",
-        reply_markup=main_menu_with_welcome,
+        reply_markup=user_navigation_keyboard(),
     )
 
 
@@ -178,9 +175,5 @@ async def welcome_bonus_claim(
         "ℹ️ Bonusning aniq holati va navbatini "
         "👤 <b>Mening obunam</b> bo‘limidan ko‘rishingiz mumkin.",
         parse_mode="HTML",
-    )
-
-    await callback.message.answer(
-        "🏠 Asosiy menyu",
-        reply_markup=main_menu,
+        reply_markup=user_navigation_keyboard(),
     )

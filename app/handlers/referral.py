@@ -1,7 +1,7 @@
 from html import escape
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 
 from app.database.database import async_session
 from app.keyboards.menu import main_menu
@@ -73,24 +73,5 @@ async def referral_menu(message: Message):
     await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=user_navigation_keyboard(
-            back_callback="referral_back",
-        ),
-    )
-
-
-@router.callback_query(F.data == "referral_back")
-async def referral_back(callback: CallbackQuery):
-    await callback.answer()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.bot.send_message(
-        chat_id=callback.message.chat.id,
-        text="🏠 <b>ASOSIY MENYU</b>",
-        parse_mode="HTML",
-        reply_markup=main_menu,
+        reply_markup=user_navigation_keyboard(),
     )

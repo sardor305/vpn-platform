@@ -29,8 +29,8 @@ def help_inline_keyboard(has_phone: bool) -> InlineKeyboardMarkup:
 
     rows.append([
         InlineKeyboardButton(
-            text="↩️ Ortga",
-            callback_data="help_back",
+            text="🏠 Asosiy menyu",
+            callback_data="user_main_menu",
         )
     ])
 
@@ -140,15 +140,8 @@ async def help_phone_cancel(message: Message):
 @router.callback_query(F.data == "help_back")
 async def help_back(callback: CallbackQuery):
     await callback.answer()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.bot.send_message(
-        chat_id=callback.message.chat.id,
-        text="🏠 <b>ASOSIY MENYU</b>",
+    await callback.message.edit_text(
+        "🏠 <b>ASOSIY MENYU</b>",
         parse_mode="HTML",
         reply_markup=main_menu,
     )

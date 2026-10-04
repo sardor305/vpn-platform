@@ -11,7 +11,7 @@ def subscription_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="📥 Subscription",
+                    text="📥 Obuna havolasi",
                     url=subscription_url,
                 )
             ]

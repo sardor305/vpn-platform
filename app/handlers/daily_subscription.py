@@ -45,12 +45,12 @@ def _format_daily_result(result) -> str:
 
     if result.subscription_url:
         subscription_text = (
-            "🔄 <b>Subscription:</b>\n"
+            "📥 <b>Obuna havolasi:</b>\n"
             f"<code>{result.subscription_url}</code>"
         )
     else:
         subscription_text = (
-            "🔄 <b>Subscription:</b>\n"
+            "📥 <b>Obuna havolasi:</b>\n"
             "Faol xizmat davri boshlanganda mavjud bo‘ladi."
         )
 
