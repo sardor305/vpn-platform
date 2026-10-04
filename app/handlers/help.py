@@ -18,6 +18,7 @@ router = Router()
 
 def help_inline_keyboard(has_phone: bool) -> InlineKeyboardMarkup:
     rows = []
+
     if not has_phone:
         rows.append([
             InlineKeyboardButton(
@@ -25,12 +26,14 @@ def help_inline_keyboard(has_phone: bool) -> InlineKeyboardMarkup:
                 callback_data="help_phone",
             )
         ])
+
     rows.append([
         InlineKeyboardButton(
             text="↩️ Ortga",
             callback_data="help_back",
         )
     ])
+
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -60,6 +63,7 @@ def help_text(has_phone: bool) -> str:
             "🔒 Raqamingiz boshqa foydalanuvchilarga ko‘rsatilmaydi.\n\n"
             "Agar sizga yordam kerak bo‘lsa, qo‘llab-quvvatlash xizmatiga murojaat qilishingiz mumkin."
         )
+
     return (
         "📞 <b>Yordam</b>\n\n"
         "Savolingiz yoki muammoingiz bo‘lsa, biz bilan bog‘lanishingiz mumkin.\n\n"
@@ -71,7 +75,7 @@ def help_text(has_phone: bool) -> str:
 
 
 async def send_help(message: Message, has_phone: bool) -> None:
-    await message.answer(
+    await message.edit_text(
         help_text(has_phone),
         parse_mode="HTML",
         reply_markup=help_inline_keyboard(has_phone),
@@ -85,6 +89,7 @@ async def help_handler(message: Message):
         user = await user_service.get_by_telegram_id(
             telegram_id=message.from_user.id
         )
+
     if user is None:
         await message.answer(
             "📞 <b>Yordam</b>\n\n"
@@ -93,17 +98,26 @@ async def help_handler(message: Message):
             reply_markup=main_menu,
         )
         return
-    await send_help(message, bool(user.phone_number))
+
+    await message.answer(
+        help_text(bool(user.phone_number)),
+        parse_mode="HTML",
+        reply_markup=help_inline_keyboard(bool(user.phone_number)),
+    )
 
 
 @router.callback_query(F.data == "help_phone")
 async def help_phone(callback: CallbackQuery):
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "📱 <b>Telefon raqamini ulashish</b>\n\n"
         "Pastdagi <b>Telefon raqamini yuborish</b> tugmasini bosing.\n\n"
         "Telegram faqat o‘zingizning kontaktingizni yuborishingizga ruxsat beradi.",
         parse_mode="HTML",
+    )
+
+    await callback.message.answer(
+        "📱 Telefon raqamingizni yuborish uchun pastdagi tugmani bosing.",
         reply_markup=phone_share_keyboard(),
     )
 
@@ -115,16 +129,23 @@ async def help_phone_cancel(message: Message):
         user = await user_service.get_by_telegram_id(
             telegram_id=message.from_user.id
         )
-    await send_help(message, bool(user and user.phone_number))
+
+    await message.answer(
+        help_text(bool(user and user.phone_number)),
+        parse_mode="HTML",
+        reply_markup=help_inline_keyboard(bool(user and user.phone_number)),
+    )
 
 
 @router.callback_query(F.data == "help_back")
 async def help_back(callback: CallbackQuery):
     await callback.answer()
+
     try:
         await callback.message.delete()
     except Exception:
         pass
+
     await callback.bot.send_message(
         chat_id=callback.message.chat.id,
         text="🏠 <b>ASOSIY MENYU</b>",
